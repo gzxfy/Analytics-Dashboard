@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
+from backend.api.analytics import record_event
 
 router = APIRouter()
 
@@ -14,6 +15,7 @@ events_store: list[dict[str, str]] = []
 async def recieve_events(event: EventCreate):
     saved_event = event.model_dump()
     events_store.append(saved_event)
+    record_event(saved_event)
     return {"status": "success", "event": saved_event}
 
 @router.get("/events")
