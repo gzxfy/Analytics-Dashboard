@@ -11,6 +11,7 @@ platform_counts = Counter()
 sentiment_counts = Counter()
 
 def record_event(event: dict[str, str]) -> None:
+    # Just learned that this is not recommend in the professional software development world
     global total_events
 
     total_events += 1
@@ -32,6 +33,7 @@ async def broadcast_analytics():
 
     for client in list(connected_clients):
         try:
+            # send to each client asynchronously 
             await client.send_json(snapshot)
         except (RuntimeError, OSError):
             connected_clients.discard(client)

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Dashboard_Cards } from './components/dashboard_cards'
 import './App.css'
 
 function App() {
@@ -67,6 +68,8 @@ function App() {
           </section>
         </>
       )}
+
+      <Dashboard_Cards />
     </main>
   )
 }
