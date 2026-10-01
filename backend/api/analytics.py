@@ -1,10 +1,12 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from collections import Counter
+from collections import Counter, deque
+import time
 
 router = APIRouter()
 
 
 connected_clients: set[WebSocket] = set()
+event_timestamps: deque[float] = deque()
 total_events = 0
 topic_counts = Counter()
 platform_counts = Counter()
@@ -19,10 +21,24 @@ def record_event(event: dict[str, str]) -> None:
     platform_counts[event["platform"]] += 1
     sentiment_counts[event["sentiment"]] += 1
 
+    #recording each events arrive time
+    event_timestamps.append(time.monotonic())
+
+# removes timestamps older than one second
+def get_events_per_second() -> int:
+    cutoff = time.monotonic() - 1
+
+    while event_timestamps and event_timestamps[0] < cutoff:
+        event_timestamps.popleft()
+
+    return len(event_timestamps)
+
+
 
 def get_analytics_snapshot():
     return {
         "total_events": total_events,
+        "events_per_second": get_events_per_second(),
         "topic_counts": dict(topic_counts),
         "platform_counts": dict(platform_counts),
         "sentiment_counts": dict(sentiment_counts),
@@ -54,9 +70,4 @@ async def analytics_websocket(websocket: WebSocket):
 
 @router.get("/analytics")
 async def get_analytics():
-    return {
-        "total_events": total_events,
-        "topic_counts": dict(topic_counts),
-        "platform_counts": dict(platform_counts),
-        "sentiment_counts": dict(sentiment_counts),
-    }
+    return get_analytics_snapshot()

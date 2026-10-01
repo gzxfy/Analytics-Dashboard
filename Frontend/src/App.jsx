@@ -50,7 +50,7 @@ function App() {
         <p>Waiting for analytics...</p>
       ) : (
         <>
-          <h2>Total Events: {renderCounts(analytics.total_events)}</h2>
+          <h2>Total Events: {analytics.total_events.toLocaleString()}</h2>
           
           <section>
             <h2>Topics</h2>
@@ -64,12 +64,12 @@ function App() {
 
           <section>
             <h2>Sentiment</h2>
-            {renderCounts(analytics.platform_counts)}
+            {renderCounts(analytics.sentiment_counts)}
           </section>
         </>
       )}
 
-      <Dashboard_Cards />
+      <Dashboard_Cards analytics={analytics} />
     </main>
   )
 }
