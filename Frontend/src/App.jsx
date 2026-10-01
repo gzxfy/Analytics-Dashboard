@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Dashboard_Cards } from './components/dashboard_cards'
 import './App.css'
+import Live_Traffic_Graph from './components/graph'
 
 function App() {
   const [analytics, setAnalytics] = useState(null)
@@ -68,8 +69,11 @@ function App() {
           </section>
         </>
       )}
-
+    
       <Dashboard_Cards analytics={analytics} />
+
+      <h2>Live Traffic Graph</h2>
+      <Live_Traffic_Graph analytics={analytics} />
     </main>
   )
 }
