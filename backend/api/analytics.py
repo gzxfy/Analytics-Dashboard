@@ -3,7 +3,6 @@ from collections import Counter
 
 router = APIRouter()
 
-
 connected_clients: set[WebSocket] = set()
 total_events = 0
 topic_counts = Counter()
