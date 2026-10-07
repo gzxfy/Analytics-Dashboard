@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Dashboard_Cards } from './components/dashboard_cards'
 import './App.css'
+import Live_Traffic_Graph from './components/graph'
 
 function App() {
   const [analytics, setAnalytics] = useState(null)
@@ -50,7 +51,7 @@ function App() {
         <p>Waiting for analytics...</p>
       ) : (
         <>
-          <h2>Total Events: {renderCounts(analytics.total_events)}</h2>
+          <h2>Total Events: {analytics.total_events.toLocaleString()}</h2>
           
           <section>
             <h2>Topics</h2>
@@ -64,12 +65,15 @@ function App() {
 
           <section>
             <h2>Sentiment</h2>
-            {renderCounts(analytics.platform_counts)}
+            {renderCounts(analytics.sentiment_counts)}
           </section>
         </>
       )}
+    
+      <Dashboard_Cards analytics={analytics} />
 
-      <Dashboard_Cards />
+      <h2>Live Traffic Graph</h2>
+      <Live_Traffic_Graph analytics={analytics} />
     </main>
   )
 }
