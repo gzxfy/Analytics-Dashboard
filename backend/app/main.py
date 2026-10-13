@@ -5,6 +5,8 @@ from fastapi import FastAPI
 from backend.api.analytics import broadcast_analytics
 from backend.api.events import router as events_router
 from backend.api.analytics import router as analytics_router
+from backend.models.db import Base, engine
+from backend.models.models import Event
 
 async def brodcast_loop():
     while True:
@@ -13,6 +15,9 @@ async def brodcast_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+        
     task = asyncio.create_task(brodcast_loop())
     try: 
         yield

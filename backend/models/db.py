@@ -1,5 +1,8 @@
 import os
 from collections.abc import AsyncIterator
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -7,7 +10,6 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase
-
 
 class Base(DeclarativeBase):
     pass
