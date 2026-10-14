@@ -1,24 +1,25 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from collections import Counter, deque
 import time
+from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from backend.models.db import get_session, SessionFactory
+import backend.services.analytics as analytics_services
 
 router = APIRouter()
 
 connected_clients: set[WebSocket] = set()
 event_timestamps: deque[float] = deque()
-total_events = 0
-topic_counts = Counter()
-platform_counts = Counter()
-sentiment_counts = Counter()
 
-def record_event(event: dict[str, str]) -> None:
+
+def record_event_arrival() -> None:
     # Just learned that this is not recommend in the professional software development world
     global total_events
 
-    total_events += 1
-    topic_counts[event["topic"]] += 1
-    platform_counts[event["platform"]] += 1
-    sentiment_counts[event["sentiment"]] += 1
+    # total_events += 1
+    # topic_counts[event["topic"]] += 1
+    # platform_counts[event["platform"]] += 1
+    # sentiment_counts[event["sentiment"]] += 1
 
     #recording each events arrive time
     event_timestamps.append(time.monotonic())
@@ -32,23 +33,17 @@ def get_events_per_second() -> int:
 
     return len(event_timestamps)
 
-
-
-def get_analytics_snapshot():
-    return {
-        "total_events": total_events,
-        "events_per_second": get_events_per_second(),
-        "topic_counts": dict(topic_counts),
-        "platform_counts": dict(platform_counts),
-        "sentiment_counts": dict(sentiment_counts),
-    }
-
 async def broadcast_analytics():
-    snapshot = get_analytics_snapshot()
+    if not connected_clients:
+        return
+    
+    async with SessionFactory() as session:
+        snapshot = await analytics_services.get_persistent_analytics(session)
+
+    snapshot["events_per_second"] = get_events_per_second()
 
     for client in list(connected_clients):
         try:
-            # send to each client asynchronously 
             await client.send_json(snapshot)
         except (RuntimeError, OSError):
             connected_clients.discard(client)
@@ -59,7 +54,11 @@ async def analytics_websocket(websocket: WebSocket):
     connected_clients.add(websocket)
 
     try:
-        await websocket.send_json(get_analytics_snapshot())
+        async with SessionFactory() as session:
+            snapshot = await analytics_services.get_persistent_analytics(session)
+
+        snapshot["events_per_second"] = get_events_per_second()
+        await websocket.send_json(snapshot)
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
@@ -68,5 +67,7 @@ async def analytics_websocket(websocket: WebSocket):
         connected_clients.discard(websocket)
 
 @router.get("/analytics")
-async def get_analytics():
-    return get_analytics_snapshot()
+async def get_analytics(session: AsyncSession = Depends(get_session)):
+    snapshot = await analytics_services.get_persistent_analytics(session)
+    snapshot["events_per_second"] = get_events_per_second()
+    return snapshot
