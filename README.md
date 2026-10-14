@@ -109,7 +109,7 @@ The dashboard connects to `ws://127.0.0.1:8000/ws/analytics`. Keep the API and g
 
 ### Current Architecture
 
-`backend/app/main.py` creates the FastAPI application, creates the database schema at startup, and runs a background analytics broadcaster every 0.25 seconds. A broadcast failure is logged without stopping later iterations. `backend/api/events.py` validates incoming payloads with Pydantic, stores events through an async SQLAlchemy session, and returns events in bounded pages. `backend/services/analytics.py` queries PostgreSQL for persistent counts. `backend/api/analytics.py` serves analytics snapshots and broadcasts them to connected WebSocket clients; the events-per-second rate and client connections remain process-local. `generator/generator.py` posts sample events, and `Frontend/src/App.jsx` receives WebSocket snapshots, renders the dashboard, and reconnects with increasing delays if the socket closes.
+`backend/app/main.py` creates the FastAPI application, creates the database schema at startup, and runs a background analytics broadcaster sleeping 0.25 seconds between cycles. A broadcast failure is logged without stopping later iterations. `backend/api/events.py` validates incoming payloads with Pydantic, stores events through an async SQLAlchemy session, and returns events in bounded pages. `backend/services/analytics.py` queries PostgreSQL for persistent counts. `backend/api/analytics.py` serves analytics snapshots and broadcasts them to connected WebSocket clients; the events-per-second rate and client connections remain process-local. `generator/generator.py` posts sample events, and `Frontend/src/App.jsx` receives WebSocket snapshots, renders the dashboard, and reconnects with increasing delays if the socket closes.
 
 The current database is PostgreSQL, accessed through SQLAlchemy's asyncpg driver. Event history and aggregate counts survive backend restarts. The rolling rate and WebSocket connections are in memory and are local to one backend process.
 
@@ -152,7 +152,8 @@ The roadmap is deliberately incremental: get one useful version working, then ad
 ### MVP 3: Automated tests
 
 - [x] Test event creation (`POST /events`), analytics (`GET /analytics`), payload validation, paginated event listing, and broadcaster recovery after a failed cycle.
-- [ ] Add WebSocket behavior and larger-volume aggregate tests.
+- [x] Add WebSocket behavior 
+- [] larger-volume aggregate tests.
 
 ### MVP 4: Load testing
 

@@ -13,15 +13,15 @@ router = APIRouter()
 @router.post("/events")
 async def recieve_events(event: EventCreate, session: AsyncSession = Depends(get_session),):
     
-    saved_event = event.model_dump()
+    request_data = event.model_dump()
 
-    database_event = Event(**saved_event)
+    database_event = Event(**request_data)
     session.add(database_event)
     await session.commit()
 
     record_event_arrival()
 
-    return {"status": "success", "event": saved_event}
+    return {"status": "success", "event": request_data}
 
 @router.get("/events")
 async def list_events(

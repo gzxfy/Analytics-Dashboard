@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.models.models import Event
 
 async def get_total_events(session: AsyncSession) -> int:
+    # Describe, Execute, and Extract 
     statement = select(func.count()).select_from(Event)
     result = await session.execute(statement)
     return result.scalar_one()

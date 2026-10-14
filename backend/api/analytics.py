@@ -28,6 +28,7 @@ def record_event_arrival() -> None:
 def get_events_per_second() -> int:
     cutoff = time.monotonic() - 1
 
+    # remove timestamps older than one second
     while event_timestamps and event_timestamps[0] < cutoff:
         event_timestamps.popleft()
 
@@ -36,9 +37,9 @@ def get_events_per_second() -> int:
 async def broadcast_analytics():
     if not connected_clients:
         return
-    
-    snapshot = await load_analytics_snapshot()
 
+    # loads the lastest snapshot then send it to all connected clients
+    snapshot = await load_analytics_snapshot()
 
     for client in list(connected_clients):
         try:
