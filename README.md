@@ -1,23 +1,21 @@
 # Real-Time Event Analytics Dashboard
 
-<!-- TODO: Replace this summary with your own project description and add a live demo link if available. -->
+A real-time event analytics dashboard. A Python event generator sends sample events to a FastAPI backend, which stores them in PostgreSQL and broadcasts analytics snapshots to a React dashboard over a WebSocket connection.
 
-A small real-time analytics prototype. A Python event generator sends sample events to a FastAPI backend, which updates in-memory counts and broadcasts snapshots to a React dashboard over a WebSocket connection.
-
-The project is intentionally at its first MVP stage: it demonstrates the event-ingestion and live-update loop without a database or durable storage. Events and analytics are lost when the backend process restarts.
+Event history and aggregate counts are backed by PostgreSQL and persist when the backend restarts. The events-per-second metric is a process-local, rolling one-second count.
 
 ## What It Does
 
-Each event contains a `platform`, `topic`, and `sentiment`. The backend accepts events, keeps them in memory, updates aggregate counts, and sends the latest analytics snapshot to connected browsers. The included generator creates sample Reddit, YouTube, and Twitter events every 0.2 seconds.
+Each event contains a `platform`, `topic`, and `sentiment`. The backend accepts events, keeps them in PostgreSQL, updates aggregate counts, and sends the latest analytics snapshot to connected browsers. The included generator creates sample Reddit, YouTube, and Twitter events every 0.2 seconds.
 
 Current backend endpoints:
 
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `GET` | `/health` | Check whether the API is running. |
-| `POST` | `/events` | Validate and record one event, then broadcast updated analytics. |
-| `GET` | `/events` | Return events held in the in-memory list. |
-| `GET` | `/analytics` | Return aggregate event, topic, platform, and sentiment counts. |
+| `POST` | `/events` | Validate and store one event in PostgreSQL. |
+| `GET` | `/events?limit=100&offset=0` | Return one ordered page of events; `limit` is between 1 and 500. |
+| `GET` | `/analytics` | Return aggregate event, topic, platform, and sentiment counts, plus the current events-per-second rate. |
 | WebSocket | `/ws/analytics` | Send the current snapshot on connect and broadcast subsequent updates. |
 
 Interactive API documentation is available at <http://127.0.0.1:8000/docs> while the backend is running.
@@ -36,7 +34,7 @@ Example after adding an image: `![Live analytics dashboard](docs/screenshots/das
 
 ## Run Locally
 
-Requirements: Python 3.14 or newer (per `pyproject.toml`), Node.js, and npm. Start each part in its own terminal from the repository root.
+Requirements: Python 3.14 or newer (per `pyproject.toml`), [uv](https://docs.astral.sh/uv/), Docker Compose, Node.js, and npm. Start each part in its own terminal from the repository root.
 
 ### 1. Install backend dependencies
 
@@ -56,16 +54,25 @@ Activate the environment:
 source .venv/bin/activate
 ```
 
-Install the project dependencies with `uv`:
+Install the backend and test dependencies with `uv`:
 
 ```bash
-uv sync
+uv sync --extra test
 ```
 
-Alternatively, install FastAPI and its standard extras into the active environment:
+Create a `.env` file in the repository root for the local PostgreSQL container and app:
+
+```dotenv
+POSTGRES_PASSWORD=local-dev-password
+DATABASE_URL=postgresql+asyncpg://analytics:local-dev-password@localhost:5433/analytics_db
+TEST_DATABASE_URL=postgresql+asyncpg://analytics:local-dev-password@localhost:5433/analytics_test
+```
+
+Start PostgreSQL:
 
 ```bash
-python -m pip install "fastapi[standard]>=0.141.1"
+docker compose --env-file .env -f backend/docker/docker-compose.yml up -d
+docker compose --env-file .env -f backend/docker/docker-compose.yml exec postgres createdb -U analytics analytics_test
 ```
 
 ### 2. Start the API
@@ -100,17 +107,11 @@ The dashboard connects to `ws://127.0.0.1:8000/ws/analytics`. Keep the API and g
 
 ## Architecture
 
-### Current MVP
+### Current Architecture
 
-Will add flow chart here
+`backend/app/main.py` creates the FastAPI application, creates the database schema at startup, and runs a background analytics broadcaster every 0.25 seconds. A broadcast failure is logged without stopping later iterations. `backend/api/events.py` validates incoming payloads with Pydantic, stores events through an async SQLAlchemy session, and returns events in bounded pages. `backend/services/analytics.py` queries PostgreSQL for persistent counts. `backend/api/analytics.py` serves analytics snapshots and broadcasts them to connected WebSocket clients; the events-per-second rate and client connections remain process-local. `generator/generator.py` posts sample events, and `Frontend/src/App.jsx` receives WebSocket snapshots, renders the dashboard, and reconnects with increasing delays if the socket closes.
 
-`backend/app/main.py` creates the FastAPI application and registers the event and analytics routers. `backend/api/events.py` validates incoming payloads with Pydantic, appends them to a module-level list, and asks the analytics module to broadcast an update. `backend/api/analytics.py` maintains process-local counters and connected WebSocket clients. `generator/generator.py` posts fake events, and `Frontend/src/App.jsx` receives WebSocket snapshots and renders the dashboard.
-
-This architecture is intentionally simple for the first MVP. The list and counters are in process memory: they do not survive a restart, are not shared between multiple backend workers, and do not provide database transactions or durable history. The React dashboard is also an early implementation; its cards and some display details remain in progress.
-
-### Planned Database Architecture
-
-After the MVP works end to end, replace the in-memory store with PostgreSQL through SQLAlchemy:
+The current database is PostgreSQL, accessed through SQLAlchemy's asyncpg driver. Event history and aggregate counts survive backend restarts. The rolling rate and WebSocket connections are in memory and are local to one backend process.
 
 ```mermaid
 flowchart TD
@@ -128,7 +129,7 @@ flowchart TD
 		WebSocket --> React
 ```
 
-The database work can focus on models, relationships where useful, queries, indexes, and transaction boundaries. Keep the existing in-memory approach until the end-to-end MVP is stable.
+Database migrations and multi-worker distribution for live updates remain future improvements.
 
 ## Development Roadmap
 
@@ -138,17 +139,20 @@ The roadmap is deliberately incremental: get one useful version working, then ad
 
 - [x] FastAPI accepts event payloads.
 - [x] Sample generator posts events.
-- [x] Analytics are aggregated in memory.
+- [x] Analytics are queried from PostgreSQL.
 - [x] WebSocket broadcasts snapshots to the React frontend.
 - [ ] Finish and verify the dashboard's metric displays and empty/disconnected states.
 
 ### MVP 2: PostgreSQL persistence
 
-Replace the module-level `events = []` store and process-local aggregates with PostgreSQL-backed persistence using SQLAlchemy. Explore model design, any useful relationships, aggregation queries, indexes, and transaction behavior. Keep the model simple if the event data does not need many relationships.
+- [x] Store events in PostgreSQL using async SQLAlchemy.
+- [x] Query persistent event, topic, platform, and sentiment counts.
+- [ ] Add migrations and review indexes as the data volume grows.
 
 ### MVP 3: Automated tests
 
-Add pytest coverage for event creation (`POST /events`), analytics (`GET /analytics`), payload validation, and WebSocket behavior. Include correctness checks for larger input volumes, such as whether aggregates remain correct after 10,000 submitted events.
+- [x] Test event creation (`POST /events`), analytics (`GET /analytics`), payload validation, paginated event listing, and broadcaster recovery after a failed cycle.
+- [ ] Add WebSocket behavior and larger-volume aggregate tests.
 
 ### MVP 4: Load testing
 
@@ -168,13 +172,21 @@ Consider Redis only after persistence and baseline measurements exist. If analyt
 backend/
 	app/          FastAPI application setup
 	api/          Event and analytics HTTP/WebSocket routes
-	models/       Placeholder for database models and configuration
+	models/       SQLAlchemy models, schemas, and async database setup
+	services/     Database-backed analytics queries
+tests/          Backend API and analytics tests
 Frontend/
 	src/          React application and dashboard components
 generator/      Synthetic event producer
 ```
 
 ## Useful Commands
+
+From the repository root, after PostgreSQL and the `analytics_test` database are running:
+
+```bash
+python -m pytest -q
+```
 
 From `Frontend/`:
 
@@ -183,10 +195,5 @@ npm run build
 npm run lint
 ```
 
-<!-- TODO: Update this section as automated backend tests and load tests are added. -->
+Load testing is planned but not configured yet; see MVP 4 above for the proposed workload and metrics.
 
-<!-- ## License
-
-<!-- TODO: Add a LICENSE file and name the chosen license here. -->
-
-No license has been specified yet. -->

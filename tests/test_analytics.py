@@ -1,5 +1,9 @@
+import asyncio
+import logging
+
 import pytest
 
+import backend.app.main as app_main
 from backend.models.models import Event
 import backend.services.analytics as analytics_services
 
@@ -109,5 +113,30 @@ async def test_empty_analytics(db_session):
         "platform_counts": {},
         "sentiment_counts": {}
     }
+
+
+@pytest.mark.anyio
+async def test_broadcast_loop_continues_after_broadcast_failure(monkeypatch, caplog):
+    broadcast_calls = 0
+
+    async def broadcast_once_fails():
+        nonlocal broadcast_calls
+        broadcast_calls += 1
+        if broadcast_calls == 1:
+            raise RuntimeError("database unavailable")
+        raise asyncio.CancelledError
+
+    async def skip_sleep(_delay):
+        return None
+
+    monkeypatch.setattr(app_main, "broadcast_analytics", broadcast_once_fails)
+    monkeypatch.setattr(app_main.asyncio, "sleep", skip_sleep)
+
+    with caplog.at_level(logging.ERROR):
+        with pytest.raises(asyncio.CancelledError):
+            await app_main.broadcast_loop()
+
+    assert broadcast_calls == 2
+    assert "Analytics broadcast failed" in caplog.text
 
 # End of test cases for analytics services

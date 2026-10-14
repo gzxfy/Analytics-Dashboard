@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.api.analytics import broadcast_analytics, record_event_arrival
+from backend.api.analytics import record_event_arrival
 from backend.models.db import get_session
 from backend.models.models import Event
 from backend.models.schemas import EventCreate, EventRead
@@ -24,9 +24,13 @@ async def recieve_events(event: EventCreate, session: AsyncSession = Depends(get
     return {"status": "success", "event": saved_event}
 
 @router.get("/events")
-async def list_events(session: AsyncSession = Depends(get_session),):
+async def list_events(
+    session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+):
     result = await session.execute(
-        select(Event).order_by(Event.id)
+        select(Event).order_by(Event.id).limit(limit).offset(offset)
     )
 
     database_events = result.scalars().all()

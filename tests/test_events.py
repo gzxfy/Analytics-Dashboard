@@ -80,6 +80,34 @@ async def test_post_events_without_sentiment(client, db_session):
     assert len(saved_events) == 0
 
 @pytest.mark.anyio
+async def test_get_events_paginates_from_first_event(client, db_session):
+    db_session.add_all([
+        Event(platform="reddit", topic="python", sentiment="positive"),
+        Event(platform="twitter", topic="ai", sentiment="neutral"),
+        Event(platform="youtube", topic="ml", sentiment="negative"),
+    ])
+    await db_session.flush()
+
+    first_page = await client.get("/events")
+    next_page = await client.get("/events", params={"limit": 1, "offset": 1})
+
+    assert first_page.status_code == 200
+    assert [event["platform"] for event in first_page.json()["events"]] == [
+        "reddit",
+        "twitter",
+        "youtube",
+    ]
+    assert next_page.status_code == 200
+    assert [event["platform"] for event in next_page.json()["events"]] == ["twitter"]
+
+
+@pytest.mark.anyio
+async def test_get_events_rejects_invalid_page_size(client):
+    response = await client.get("/events", params={"limit": 501})
+
+    assert response.status_code == 422
+
+@pytest.mark.anyio
 async def test_topic_length_boundary(client, db_session):
     """Test posting an event with a topic at the length boundary."""
     # Topic length exceeds the maximum allowed length (255 characters)

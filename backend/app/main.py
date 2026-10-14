@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -8,17 +9,23 @@ from backend.api.analytics import router as analytics_router
 from backend.models.db import Base, engine
 from backend.models.models import Event
 
-async def brodcast_loop():
+logger = logging.getLogger(__name__)
+
+
+async def broadcast_loop():
     while True:
         await asyncio.sleep(0.25)
-        await broadcast_analytics()
+        try:
+            await broadcast_analytics()
+        except Exception:
+            logger.exception("Analytics broadcast failed")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
         
-    task = asyncio.create_task(brodcast_loop())
+    task = asyncio.create_task(broadcast_loop())
     try: 
         yield
     finally:

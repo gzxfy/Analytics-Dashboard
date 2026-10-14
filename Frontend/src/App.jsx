@@ -7,27 +7,57 @@ function App() {
   const [analytics, setAnalytics] = useState(null)
   const [connectionStatus, setConnectionStatus] = useState("connecting")
 
+  // WebSocket connection and retry logic will be handled in the useEffect below. Helps stop scheduling multiple connections and manages reconnection attempts.
   useEffect(() => {
-    const socket = new WebSocket("ws://127.0.0.1:8000/ws/analytics")
+    const initialDelayMs = 500
+    const maxDelayMs = 30000
 
-    socket.addEventListener("open", () => {
-      setConnectionStatus("connected")
-    })
+    let retryDelayMs = initialDelayMs
+    let retryTimer
+    let socket
+    let stopped = false
 
-    socket.addEventListener("message", (message) => {
-      setAnalytics(JSON.parse(message.data))
-    })
+    function connect() {
+      if (stopped) return
 
-    socket.addEventListener('error', () => {
-      setConnectionStatus('error')
-    })
+      setConnectionStatus('connecting')
+      socket = new WebSocket('ws://127.0.0.1:8000/ws/analytics')
 
-    socket.addEventListener('close', () => {
-      setConnectionStatus('disconnected')
-    })
+      socket.addEventListener('open', () => {
+        if (stopped) return
 
-    return () => socket.close()
+        setConnectionStatus('connected')
+        retryDelayMs = initialDelayMs
+      })
+
+      socket.addEventListener('message', (message) => {
+        if (stopped) return
+
+        setAnalytics(JSON.parse(message.data))
+      })
+
+      socket.addEventListener('error', () => {
+        if (!stopped) setConnectionStatus('error')
+      })
+
+      socket.addEventListener('close', () => {
+        if (stopped) return
+
+        setConnectionStatus('disconnected')
+        retryTimer = setTimeout(connect, retryDelayMs)
+        retryDelayMs = Math.min(retryDelayMs * 2, maxDelayMs)
+      })
+    }
+
+    connect()
+
+    return () => {
+      stopped = true
+      clearTimeout(retryTimer)
+      socket?.close()
+    }
   }, [])
+
 
   function renderCounts(counts) {
     return (
