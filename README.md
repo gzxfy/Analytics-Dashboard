@@ -57,7 +57,15 @@ source .venv/bin/activate
 Install the backend and test dependencies with `uv`:
 
 ```bash
-uv sync --extra test
+uv sync --locked --extra test
+```
+
+`pyproject.toml` declares the project's dependencies, and `uv.lock` records the resolved versions. `requirements.txt` is a generated export that includes the test dependencies; do not edit it manually.
+
+When adding a runtime dependency, use `uv add PACKAGE`. For test-only dependencies, use `uv add --optional test PACKAGE`. After changing dependencies, regenerate the export and commit all three dependency files together:
+
+```bash
+uv export --locked --extra test --no-hashes --output-file requirements.txt
 ```
 
 Create a `.env` file in the repository root for the local PostgreSQL container and app:
@@ -152,8 +160,11 @@ The roadmap is deliberately incremental: get one useful version working, then ad
 ### MVP 3: Automated tests
 
 - [x] Test event creation (`POST /events`), analytics (`GET /analytics`), payload validation, paginated event listing, and broadcaster recovery after a failed cycle.
-- [x] Add WebSocket behavior 
-- [] larger-volume aggregate tests.
+- [x] Test WebSocket initial snapshots, broadcasting, failed-client removal, and recovery after a mocked snapshot-loading failure.
+- [x] Test timestamp pruning on event arrival and analytics reads.
+- [x] Test removal of a client whose send raises a timeout exception.
+- [ ] Add larger-volume aggregate tests.
+- [ ] Verify recovery from a real PostgreSQL outage and frontend reconnection after a backend restart.
 
 ### MVP 4: Load testing
 

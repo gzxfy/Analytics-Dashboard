@@ -6,6 +6,8 @@ import pytest
 import backend.app.main as app_main
 from backend.models.models import Event
 import backend.services.analytics as analytics_services
+from collections import deque
+import backend.api.analytics as analytics_api
 
 
 @pytest.mark.anyio
@@ -139,4 +141,24 @@ async def test_broadcast_loop_continues_after_broadcast_failure(monkeypatch, cap
     assert broadcast_calls == 2
     assert "Analytics broadcast failed" in caplog.text
 
-# End of test cases for analytics services
+def test_record_event_arrival_prunes_old_timestamps(monkeypatch):
+    timestamps = deque([5.0, 5.8, 6.1])
+
+    monkeypatch.setattr(analytics_api, "event_timestamps", timestamps)
+    monkeypatch.setattr(analytics_api.time, "monotonic", lambda: 6.5)
+
+    analytics_api.record_event_arrival()
+
+    assert list(analytics_api.event_timestamps) == [5.8, 6.1, 6.5]
+
+
+def test_get_events_per_second_prunes_old_timestamps(monkeypatch):
+    timestamps = deque([5.8, 6.1, 6.5])
+
+    monkeypatch.setattr(analytics_api, "event_timestamps", timestamps)
+    monkeypatch.setattr(analytics_api.time, "monotonic", lambda: 8)
+
+    events_per_second = analytics_api.get_events_per_second()
+
+    assert events_per_second == 0
+    assert list(timestamps) == []

@@ -146,3 +146,42 @@ async def test_analytics_counts_posted_events(client):
     assert snapshot["platform_counts"] == {"reddit": 2, "twitter": 1}
     assert snapshot["topic_counts"] == {"python": 1, "ai": 1, "ml": 1}
     assert snapshot["sentiment_counts"] == {"positive": 2, "negative": 1}
+
+
+# Pagination tests
+@pytest.mark.anyio
+async def test_get_events_returns_empty_list(client):
+    response = await client.get("/events")
+
+    assert response.status_code == 200
+    assert response.json() == {"events": []}
+
+@pytest.mark.anyio
+async def test_end_of_pagination(client):
+    await client.post("/events", json={"platform": "reddit", "topic": "python", "sentiment": "positive"})
+    await client.post("/events", json={"platform": "twitter", "topic": "ai", "sentiment": "negative"})
+    await client.post("/events", json={"platform": "reddit", "topic": "ml", "sentiment": "positive"})   
+    response = await client.get("/events", params={"limit": 10, "offset": 100})
+
+    assert response.status_code == 200
+    assert response.json() == {"events": []}
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("params", [ {"limit": -1}, {"limit": 0}, {"limit": 501}, {"offset": -1},])
+async def test_invalid_pagination_parameters(client, params):
+    response = await client.get("/events", params=params)
+
+    assert response.status_code == 422
+
+@pytest.mark.anyio
+async def test_partial_final_page(client):
+    await client.post("/events", json={"platform": "reddit", "topic": "python", "sentiment": "positive"})
+    await client.post("/events", json={"platform": "twitter", "topic": "ai", "sentiment": "negative"})
+    await client.post("/events", json={"platform": "reddit", "topic": "ml", "sentiment": "positive"})
+
+    response = await client.get("/events", params={"limit": 2, "offset": 2})
+
+    assert response.status_code == 200
+    events = response.json()["events"]
+    assert len(events) == 1
+    assert events[0]["topic"] == "ml"

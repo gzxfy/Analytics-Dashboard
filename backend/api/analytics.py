@@ -1,6 +1,7 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from collections import deque
 import time
+import asyncio
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.models.db import get_session, SessionFactory
@@ -20,9 +21,17 @@ async def load_analytics_snapshot():
     return snapshot
 
 
+# Recording each event's arrival time
 def record_event_arrival() -> None:
-    # Recording each event's arrival time
-    event_timestamps.append(time.monotonic())
+    now = time.monotonic()
+    cutoff = now - 1
+
+    # remove timestamps older than one second before recording the new event
+    while event_timestamps and event_timestamps[0] < cutoff:
+        event_timestamps.popleft()
+
+    # record the current event's timestamp
+    event_timestamps.append(now)
 
 # removes timestamps older than one second
 def get_events_per_second() -> int:
@@ -43,8 +52,8 @@ async def broadcast_analytics():
 
     for client in list(connected_clients):
         try:
-            await client.send_json(snapshot)
-        except (RuntimeError, OSError):
+            await asyncio.wait_for(client.send_json(snapshot), timeout=1.0)
+        except (RuntimeError, OSError, asyncio.TimeoutError):
             connected_clients.discard(client)
 
 @router.websocket("/ws/analytics")

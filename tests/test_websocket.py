@@ -146,4 +146,67 @@ async def test_broadcast_with_no_connected_clients(monkeypatch):
 
     # Assert that no database work is requested
     assert analytics_api.connected_clients == set()
-    
+
+# testing if the broadcast_analytics function handles exceptions correctly
+@pytest.mark.anyio
+async def test_broadcast_recovers_after_snapshot_failure(monkeypatch):
+    snapshot = {"total_events": 3}
+    loader = AsyncMock(
+        side_effect=[
+            RuntimeError("database unavailable"),
+            snapshot,
+        ]
+    )
+    client = AsyncMock()
+
+    monkeypatch.setattr(analytics_api, "load_analytics_snapshot", loader)
+    monkeypatch.setattr(analytics_api, "connected_clients", {client})
+
+    with pytest.raises(RuntimeError, match="database unavailable"):
+        await analytics_api.broadcast_analytics()
+
+    client.send_json.assert_not_awaited()
+
+    await analytics_api.broadcast_analytics()
+
+    client.send_json.assert_awaited_once_with(snapshot)
+    assert client in analytics_api.connected_clients
+
+# this will test if one client fails will be removed from the connected clients set while the healthy client remains connected
+@pytest.mark.anyio
+async def test_broadcast_removes_timed_out_client(monkeypatch):
+    expected = {
+        "total_events": 3,
+        "events_per_second": 0,
+        "topic_counts": {"python": 3},
+        "platform_counts": {"reddit": 3},
+        "sentiment_counts": {"positive": 3},
+    }
+
+    loader = AsyncMock(return_value=expected)
+    failed_client = AsyncMock()
+    healthy_client = AsyncMock()
+
+    failed_client.send_json.side_effect = TimeoutError("Connection timed out")
+
+    monkeypatch.setattr(
+        analytics_api,
+        "load_analytics_snapshot",
+        loader,
+    )
+    monkeypatch.setattr(
+        analytics_api,
+        "connected_clients",
+        {failed_client, healthy_client},
+    )
+
+    await analytics_api.broadcast_analytics()
+
+    # Assert that slow client was removed
+    assert failed_client not in analytics_api.connected_clients
+
+    # Assert that the healthy client received the correct snapshot.
+    healthy_client.send_json.assert_awaited_once_with(expected)
+
+    # Assert that the healthy client remains connected.
+    assert healthy_client in analytics_api.connected_clients
