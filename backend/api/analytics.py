@@ -1,5 +1,5 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from collections import Counter, deque
+from collections import deque
 import time
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,17 +11,17 @@ router = APIRouter()
 connected_clients: set[WebSocket] = set()
 event_timestamps: deque[float] = deque()
 
+# Helper function to load the analytics snapshot including events per second
+async def load_analytics_snapshot():
+    async with SessionFactory() as session:
+        snapshot = await analytics_services.get_persistent_analytics(session)
+
+    snapshot["events_per_second"] = get_events_per_second()
+    return snapshot
+
 
 def record_event_arrival() -> None:
-    # Just learned that this is not recommend in the professional software development world
-    global total_events
-
-    # total_events += 1
-    # topic_counts[event["topic"]] += 1
-    # platform_counts[event["platform"]] += 1
-    # sentiment_counts[event["sentiment"]] += 1
-
-    #recording each events arrive time
+    # Recording each event's arrival time
     event_timestamps.append(time.monotonic())
 
 # removes timestamps older than one second
@@ -37,10 +37,8 @@ async def broadcast_analytics():
     if not connected_clients:
         return
     
-    async with SessionFactory() as session:
-        snapshot = await analytics_services.get_persistent_analytics(session)
+    snapshot = await load_analytics_snapshot()
 
-    snapshot["events_per_second"] = get_events_per_second()
 
     for client in list(connected_clients):
         try:
@@ -51,14 +49,12 @@ async def broadcast_analytics():
 @router.websocket("/ws/analytics")
 async def analytics_websocket(websocket: WebSocket):
     await websocket.accept()
-    connected_clients.add(websocket)
 
     try:
-        async with SessionFactory() as session:
-            snapshot = await analytics_services.get_persistent_analytics(session)
+        snapshot = await load_analytics_snapshot()
 
-        snapshot["events_per_second"] = get_events_per_second()
         await websocket.send_json(snapshot)
+        connected_clients.add(websocket)
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
