@@ -162,3 +162,45 @@ def test_get_events_per_second_prunes_old_timestamps(monkeypatch):
 
     assert events_per_second == 0
     assert list(timestamps) == []
+
+# filtered analytics
+@pytest.mark.anyio
+async def test_analytics_filters_by_platform(client, db_session):
+    # Arrange
+    await db_session.execute(Event.__table__.insert(), [
+        {"platform": "reddit", "topic": "python", "sentiment": "positive"},
+        {"platform": "youtube", "topic": "python", "sentiment": "negative"},
+        {"platform": "reddit", "topic": "python", "sentiment": "negative"}
+    ])
+    await db_session.flush()
+
+    # Act
+    response = await client.get("/analytics", params={"platform": "reddit"})
+
+    # Assert
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total_events"] == 2
+    assert data["topic_counts"] == {"python": 2}
+    assert data["platform_counts"] == {"reddit": 2}
+    assert data["sentiment_counts"] == {"positive": 1, "negative": 1}
+
+@pytest.mark.anyio
+async def test_analytics_nonexistent_filter(client, db_session):
+    # Arrange
+    await db_session.execute(Event.__table__.insert(), [
+        {"platform": "reddit", "topic": "python", "sentiment": "positive"},
+        {"platform": "youtube", "topic": "python", "sentiment": "negative"}
+    ])
+    await db_session.flush()
+
+    # Act
+    response = await client.get("/analytics", params={"platform": "nonexistent"})
+
+    # Assert
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total_events"] == 0
+    assert data["topic_counts"] == {}
+    assert data["platform_counts"] == {}
+    assert data["sentiment_counts"] == {}

@@ -73,7 +73,7 @@ async def analytics_websocket(websocket: WebSocket):
         connected_clients.discard(websocket)
 
 @router.get("/analytics")
-async def get_analytics(session: AsyncSession = Depends(get_session)):
-    snapshot = await analytics_services.get_persistent_analytics(session)
+async def get_analytics(session: AsyncSession = Depends(get_session), platform: str | None = None):
+    snapshot = await analytics_services.get_persistent_analytics(session, platform=platform)
     snapshot["events_per_second"] = get_events_per_second()
     return snapshot

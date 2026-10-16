@@ -18,106 +18,175 @@ Current backend endpoints:
 | `GET` | `/analytics` | Return aggregate event, topic, platform, and sentiment counts, plus the current events-per-second rate. |
 | WebSocket | `/ws/analytics` | Send the current snapshot on connect and broadcast subsequent updates. |
 
+`GET /analytics?platform=reddit` filters all persistent counts to Reddit
+events. Omitting `platform` includes all events. A platform with no
+matching events returns zero and empty count dictionaries.
+`events_per_second` remains process-wide.
+
 Interactive API documentation is available at <http://127.0.0.1:8000/docs> while the backend is running.
 
-## Screenshots
+## Verification evidence
+The ten-event dataset produced the expected platform, topic, and
+sentiment counts. After restarting the API, the dashboard reconnected
+and displayed the same totals.
 
-<!-- TODO: Add screenshots under docs/screenshots/ and replace these placeholders with embedded images. -->
+- [Restart demonstration](docs/evidence/restart_demo.mp4)
+- [Backend test output](docs/evidence/backend-tests.txt)
+- [Before restart](docs/evidence/ten-events-before-restart.json)
+- [After restart](docs/evidence/ten-events-after-restart.json)
 
-<!-- | View | Screenshot |
-| --- | --- |
-| Live analytics dashboard | Add `docs/screenshots/dashboard.png` |
-| WebSocket updates arriving | Add `docs/screenshots/live-updates.png` |
-| API documentation | Add `docs/screenshots/api-docs.png` |
-
-Example after adding an image: `![Live analytics dashboard](docs/screenshots/dashboard.png)`. -->
+Backend verification: 30 tests passed, with one deprecation warning.
 
 ## Run Locally
 
-Requirements: Python 3.14 or newer (per `pyproject.toml`), [uv](https://docs.astral.sh/uv/), Docker Compose, Node.js, and npm. Start each part in its own terminal from the repository root.
+Requirements: Docker Desktop with Docker Compose, Node.js, and npm.
+Run commands from the repository root unless stated otherwise.
 
-### 1. Install backend dependencies
+### 1. Configure PostgreSQL
 
-```bash
-python -m venv .venv
-```
-
-Activate the environment:
-
-```powershell
-# Windows PowerShell
-.\.venv\Scripts\Activate.ps1
-```
-
-```bash
-# macOS/Linux
-source .venv/bin/activate
-```
-
-Install the backend and test dependencies with `uv`:
-
-```bash
-uv sync --locked --extra test
-```
-
-`pyproject.toml` declares the project's dependencies, and `uv.lock` records the resolved versions. `requirements.txt` is a generated export that includes the test dependencies; do not edit it manually.
-
-When adding a runtime dependency, use `uv add PACKAGE`. For test-only dependencies, use `uv add --optional test PACKAGE`. After changing dependencies, regenerate the export and commit all three dependency files together:
-
-```bash
-uv export --locked --extra test --no-hashes --output-file requirements.txt
-```
-
-Create a `.env` file in the repository root for the local PostgreSQL container and app:
+Create a local `.env` file in the repository root:
 
 ```dotenv
-POSTGRES_PASSWORD=local-dev-password
-DATABASE_URL=postgresql+asyncpg://analytics:local-dev-password@localhost:5433/analytics_db
-TEST_DATABASE_URL=postgresql+asyncpg://analytics:local-dev-password@localhost:5433/analytics_test
+POSTGRES_PASSWORD=replace-with-your-local-password
+DOCKER_DATABASE_URL=postgresql+asyncpg://analytics:replace-with-your-local-password@postgres:5432/analytics_db
 ```
 
-Start PostgreSQL:
+Use the same password in both values. URL-encode special characters in
+the connection URL. Do not commit `.env`.
 
-```bash
-docker compose --env-file .env -f backend/docker/docker-compose.yml up -d
-docker compose --env-file .env -f backend/docker/docker-compose.yml exec postgres createdb -U analytics analytics_test
+
+### 2. Start PostgreSQL and the API
+
+Ensure Docker Desktop is running:
+
+```powershell
+docker compose --env-file .env -f backend/docker/docker-compose.yml up --build -d
 ```
 
-### 2. Start the API
+Compose waits for PostgreSQL to become healthy. The API container applies
+Alembic migrations before starting Uvicorn. Events persist in a named
+PostgreSQL volume.
 
-```bash
-python -m uvicorn backend.app.main:app --reload
+Check the API:
+
+```powershell
+Invoke-RestMethod http://localhost:8000/health
 ```
 
-The API listens at <http://127.0.0.1:8000>.
+API documentation: http://localhost:8000/docs
 
-### 3. Start the React frontend
+### 3. Start the frontend
 
-In a second terminal:
+In another terminal:
 
-```bash
+```powershell
 cd Frontend
 npm install
 npm run dev
 ```
 
-Open the local URL printed by Vite, usually <http://localhost:5173>.
+Open the URL printed by Vite. The frontend connects to
+`ws://127.0.0.1:8000/ws/analytics`.
 
-### 4. Generate sample events
+### 4. Submit an example event
 
-In a third terminal, from the repository root:
-
-```bash
-python generator/generator.py
+```powershell
+Invoke-RestMethod -Method Post `
+    -Uri http://localhost:8000/events `
+    -ContentType "application/json" `
+    -Body '{"platform":"reddit","topic":"python","sentiment":"positive"}'
 ```
 
-The dashboard connects to `ws://127.0.0.1:8000/ws/analytics`. Keep the API and generator running while viewing the dashboard. Stop the generator with `Ctrl+C`.
+Each successful POST stores a new event.
+
+For the ten-event verification, use `demo/events.json` with an empty
+database and submit each event exactly once. Do not submit this additional
+example event during that verification.
+
+Expected ten-event counts:
+
+| Category | Counts |
+| --- | --- |
+| Total | 10 |
+| Platform | reddit 4, twitter 3, youtube 3 |
+| Topic | python 4, fastapi 3, react 3 |
+| Sentiment | positive 4, negative 3, neutral 3 |
+
+### 5. Restart or stop
+
+Restart only the API:
+
+```powershell
+docker compose --env-file .env -f backend/docker/docker-compose.yml restart api
+```
+
+Stored totals survive the restart. The frontend reconnects.
+Events per second and chart history remain process/browser-local.
+
+Stop the services while preserving database storage:
+
+```powershell
+docker compose --env-file .env -f backend/docker/docker-compose.yml down
+```
+
+Adding `-v` removes the Compose-managed volume and its stored data.
+
+### Optional: use the existing local data volume
+
+For a machine that already has the `analytics_pgdata` volume:
+
+```powershell
+docker compose --env-file .env -f backend/docker/docker-compose.yml -f backend/docker/docker-compose.existing.yml up --build -d
+```
+
+This override is not required for a fresh checkout.
+
+### Backend tests and dependency maintenance
+
+Local backend development requires Python 3.14+ and uv:
+
+```powershell
+uv sync --locked --extra test
+```
+
+Add these local-only variables to `.env`, using the same PostgreSQL password:
+
+```dotenv
+DATABASE_URL=postgresql+asyncpg://analytics:replace-with-your-local-password@localhost:5433/analytics_db
+TEST_DATABASE_URL=postgresql+asyncpg://analytics:replace-with-your-local-password@localhost:5433/analytics_test
+```
+
+Create the isolated test database once per fresh PostgreSQL volume:
+
+```powershell
+docker compose --env-file .env -f backend/docker/docker-compose.yml exec postgres createdb -U analytics analytics_test
+```
+
+Then run:
+
+```powershell
+uv run pytest -q --tb=no
+```
+
+Tests use `analytics_test`, not the application's `analytics_db`.
+
+`pyproject.toml` declares dependencies; `uv.lock` records resolved versions.
+Add runtime dependencies with `uv add PACKAGE` and test dependencies with
+`uv add --optional test PACKAGE`.
+
+Regenerate `requirements.txt` after dependency changes:
+
+```powershell
+uv export --locked --extra test --no-hashes --output-file requirements.txt
+```
+
+Commit all three dependency files together.
 
 ## Architecture
 
 ### Current Architecture
 
-`backend/app/main.py` creates the FastAPI application, creates the database schema at startup, and runs a background analytics broadcaster sleeping 0.25 seconds between cycles. A broadcast failure is logged without stopping later iterations. `backend/api/events.py` validates incoming payloads with Pydantic, stores events through an async SQLAlchemy session, and returns events in bounded pages. `backend/services/analytics.py` queries PostgreSQL for persistent counts. `backend/api/analytics.py` serves analytics snapshots and broadcasts them to connected WebSocket clients; the events-per-second rate and client connections remain process-local. `generator/generator.py` posts sample events, and `Frontend/src/App.jsx` receives WebSocket snapshots, renders the dashboard, and reconnects with increasing delays if the socket closes.
+`backend/app/main.py` The API container runs alembic upgrade had before starting Uvicorn. `backend/app/main.py` creates the FASTAPI application and runs a background analytics broadcaster sleeping 0.25 seconds between cycles. A broadcast failure is logged without stopping later iterations. `backend/api/events.py` validates incoming payloads with Pydantic, stores events through an async SQLAlchemy session, and returns events in bounded pages. `backend/services/analytics.py` queries PostgreSQL for persistent counts. `backend/api/analytics.py` serves analytics snapshots and broadcasts them to connected WebSocket clients; the events-per-second rate and client connections remain process-local. `generator/generator.py` posts sample events, and `Frontend/src/App.jsx` receives WebSocket snapshots, renders the dashboard, and reconnects with increasing delays if the socket closes.
 
 The current database is PostgreSQL, accessed through SQLAlchemy's asyncpg driver. Event history and aggregate counts survive backend restarts. The rolling rate and WebSocket connections are in memory and are local to one backend process.
 
@@ -137,7 +206,7 @@ flowchart TD
 		WebSocket --> React
 ```
 
-Database migrations and multi-worker distribution for live updates remain future improvements.
+Alembic manages database schema revisions. Multi-worker distribution for live updates remains a future improvement.
 
 ## Development Roadmap
 
@@ -155,7 +224,8 @@ The roadmap is deliberately incremental: get one useful version working, then ad
 
 - [x] Store events in PostgreSQL using async SQLAlchemy.
 - [x] Query persistent event, topic, platform, and sentiment counts.
-- [ ] Add migrations and review indexes as the data volume grows.
+- [x] Add an initial Alembic migration and verify fresh-storage startup.
+- [ ] Review indexes as data volume grows.
 
 ### MVP 3: Automated tests
 
@@ -164,7 +234,8 @@ The roadmap is deliberately incremental: get one useful version working, then ad
 - [x] Test timestamp pruning on event arrival and analytics reads.
 - [x] Test removal of a client whose send raises a timeout exception.
 - [ ] Add larger-volume aggregate tests.
-- [ ] Verify recovery from a real PostgreSQL outage and frontend reconnection after a backend restart.
+- [x] Verify dashboard reconnection and persistent totals after an API restart.
+- [ ] Verify recovery from a real PostgreSQL outage.
 
 ### MVP 4: Load testing
 
@@ -172,7 +243,9 @@ Use Locust to simulate concurrent virtual users sending events and reading analy
 
 ### MVP 5: Docker
 
-Containerize the React frontend, FastAPI backend, and PostgreSQL database. Add Docker Compose so the complete development stack can be started together, for example with `docker compose up`.
+- [x] Containerize FastAPI and PostgreSQL with Compose.
+- [x] Apply migrations before API startup.
+- [ ] Containerize the React frontend; it currently runs through Vite.
 
 ### Later: Redis caching
 

@@ -1,0 +1,14 @@
+[
+  {"platform":"reddit","topic":"python","sentiment":"positive"},
+  {"platform":"reddit","topic":"python","sentiment":"negative"},
+  {"platform":"reddit","topic":"fastapi","sentiment":"positive"},
+  {"platform":"reddit","topic":"react","sentiment":"neutral"},
+  {"platform":"youtube","topic":"python","sentiment":"positive"},
+  {"platform":"youtube","topic":"fastapi","sentiment":"neutral"},
+  {"platform":"youtube","topic":"react","sentiment":"negative"},
+  {"platform":"twitter","topic":"python","sentiment":"neutral"},
+  {"platform":"twitter","topic":"fastapi","sentiment":"positive"},
+  {"platform":"twitter","topic":"react","sentiment":"negative"}
+]
+
+

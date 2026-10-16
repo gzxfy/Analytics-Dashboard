@@ -9,6 +9,7 @@ COPY pyproject.toml uv.lock ./
 # installs the dependencies 
 RUN uv sync --locked --no-dev --no-install-project
 COPY backend ./backend
+COPY alembic.ini ./
 ENV PATH="/app/.venv/bin:$PATH"
 # defines how to start application when container runs
-CMD ["python", "-m", "uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "python -m alembic upgrade head && exec python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000"]
