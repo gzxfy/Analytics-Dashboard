@@ -35,7 +35,7 @@ and displayed the same totals.
 - [Before restart](docs/evidence/ten-events-before-restart.json)
 - [After restart](docs/evidence/ten-events-after-restart.json)
 
-Backend verification: 30 tests passed, with one deprecation warning.
+Backend verification: 32 tests passed, with one deprecation warning.
 
 ## Run Locally
 
@@ -186,7 +186,8 @@ Commit all three dependency files together.
 
 ### Current Architecture
 
-`backend/app/main.py` The API container runs alembic upgrade had before starting Uvicorn. `backend/app/main.py` creates the FASTAPI application and runs a background analytics broadcaster sleeping 0.25 seconds between cycles. A broadcast failure is logged without stopping later iterations. `backend/api/events.py` validates incoming payloads with Pydantic, stores events through an async SQLAlchemy session, and returns events in bounded pages. `backend/services/analytics.py` queries PostgreSQL for persistent counts. `backend/api/analytics.py` serves analytics snapshots and broadcasts them to connected WebSocket clients; the events-per-second rate and client connections remain process-local. `generator/generator.py` posts sample events, and `Frontend/src/App.jsx` receives WebSocket snapshots, renders the dashboard, and reconnects with increasing delays if the socket closes.
+`backend/app/main.py` The API container runs `alembic upgrade head` before starting Uvicorn. `backend/app/main.py` creates the FastAPI application and runs a background
+analytics broadcaster sleeping 0.25 seconds between cycles.A broadcast failure is logged without stopping later iterations. `backend/api/events.py` validates incoming payloads with Pydantic, stores events through an async SQLAlchemy session, and returns events in bounded pages. `backend/services/analytics.py` queries PostgreSQL for persistent counts. `backend/api/analytics.py` serves analytics snapshots and broadcasts them to connected WebSocket clients; the events-per-second rate and client connections remain process-local. `generator/generator.py` posts sample events, and `Frontend/src/App.jsx` receives WebSocket snapshots, renders the dashboard, and reconnects with increasing delays if the socket closes.
 
 The current database is PostgreSQL, accessed through SQLAlchemy's asyncpg driver. Event history and aggregate counts survive backend restarts. The rolling rate and WebSocket connections are in memory and are local to one backend process.
 
