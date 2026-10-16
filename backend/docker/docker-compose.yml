@@ -1,4 +1,6 @@
+#Compose describes how containers work together
 services:
+  # Docker created the containers postgres and api
   postgres:
     image: postgres:17
 
@@ -9,9 +11,33 @@ services:
 
     ports:
       - "5433:5432"
-
+    # stores data seperately from an container
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "analytics", "-d", "analytics_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  api:
+    build:
+      context: ../..
+      dockerfile: backend/docker/DockerFile
+
+    ports:
+      - "8000:8000"
+
+    environment:
+      DATABASE_URL: ${DOCKER_DATABASE_URL:?Set DOCKER_DATABASE_URL}
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   postgres_data:
+    external: true
+    name: analytics_pgdata
