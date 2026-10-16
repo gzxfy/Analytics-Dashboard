@@ -88,20 +88,22 @@ npm run dev
 Open the URL printed by Vite. The frontend connects to
 `ws://127.0.0.1:8000/ws/analytics`.
 
-### 4. Submit an example event
+### 4. Submit 10 example events
+Start with an empty application database and submit this dataset once. Repeating it adds another ten events.
 
 ```powershell
-Invoke-RestMethod -Method Post `
-    -Uri http://localhost:8000/events `
-    -ContentType "application/json" `
-    -Body '{"platform":"reddit","topic":"python","sentiment":"positive"}'
+$events = Get-Content .\demo\events.json -Raw | ConvertFrom-Json
+
+foreach ($event in $events) {
+    Invoke-RestMethod -Method Post `
+        -Uri "http://localhost:8000/events" `
+        -ContentType "application/json" `
+        -Body ($event | ConvertTo-Json -Compress)
+}
 ```
 
 Each successful POST stores a new event.
 
-For the ten-event verification, use `demo/events.json` with an empty
-database and submit each event exactly once. Do not submit this additional
-example event during that verification.
 
 Expected ten-event counts:
 
@@ -165,7 +167,7 @@ docker compose --env-file .env -f backend/docker/docker-compose.yml exec postgre
 Then run:
 
 ```powershell
-uv run pytest -q --tb=no
+uv run python -m pytest -q --tb=no
 ```
 
 Tests use `analytics_test`, not the application's `analytics_db`.
@@ -186,8 +188,7 @@ Commit all three dependency files together.
 
 ### Current Architecture
 
-`backend/app/main.py` The API container runs `alembic upgrade head` before starting Uvicorn. `backend/app/main.py` creates the FastAPI application and runs a background
-analytics broadcaster sleeping 0.25 seconds between cycles.A broadcast failure is logged without stopping later iterations. `backend/api/events.py` validates incoming payloads with Pydantic, stores events through an async SQLAlchemy session, and returns events in bounded pages. `backend/services/analytics.py` queries PostgreSQL for persistent counts. `backend/api/analytics.py` serves analytics snapshots and broadcasts them to connected WebSocket clients; the events-per-second rate and client connections remain process-local. `generator/generator.py` posts sample events, and `Frontend/src/App.jsx` receives WebSocket snapshots, renders the dashboard, and reconnects with increasing delays if the socket closes.
+The API container runs `alembic upgrade head` before starting Uvicorn. `backend/app/main.py` creates the FastAPI application and runs a background analytics broadcaster sleeping 0.25 seconds between cycles. A broadcast failure is logged without stopping later iterations. `backend/api/events.py` validates incoming payloads with Pydantic, stores events through an async SQLAlchemy session, and returns events in bounded pages. `backend/services/analytics.py` queries PostgreSQL for persistent counts. `backend/api/analytics.py` serves analytics snapshots and broadcasts them to connected WebSocket clients; the events-per-second rate and client connections remain process-local. `generator/generator.py` posts sample events, and `Frontend/src/App.jsx` receives WebSocket snapshots, renders the dashboard, and reconnects with increasing delays if the socket closes.
 
 The current database is PostgreSQL, accessed through SQLAlchemy's asyncpg driver. Event history and aggregate counts survive backend restarts. The rolling rate and WebSocket connections are in memory and are local to one backend process.
 

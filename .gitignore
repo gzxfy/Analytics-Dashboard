@@ -159,6 +159,8 @@ venv.bak/
 .env.*
 !.env.example
 
+# Checkouts
+.fresh-check/
 
 
 # Spyder project settings
