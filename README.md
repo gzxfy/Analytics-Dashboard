@@ -30,7 +30,7 @@ The ten-event dataset produced the expected platform, topic, and
 sentiment counts. After restarting the API, the dashboard reconnected
 and displayed the same totals.
 
-- [Restart demonstration](docs/evidence/restart_demo.mp4)
+- [Restart demonstration](docs/evidence/restart_demo_compatible.mp4)
 - [Backend test output](docs/evidence/backend-tests.txt)
 - [Before restart](docs/evidence/ten-events-before-restart.json)
 - [After restart](docs/evidence/ten-events-after-restart.json)

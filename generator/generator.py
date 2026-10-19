@@ -33,7 +33,7 @@ def generate_fake_event():
         "sentiment": random.choice(sentiments)
     }
 
-
+# Function to continuously generate and send fake events to the server
 def generation_event():
     while True: 
         event = generate_fake_event()
