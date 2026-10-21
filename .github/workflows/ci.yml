@@ -1,0 +1,75 @@
+name: Project checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: analytics
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: analytics_test
+        options: >-
+          --health-cmd="pg_isready -U analytics -d analytics_test"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=10
+    env:
+      DATABASE_URL: postgresql+asyncpg://analytics:ci-only-password@127.0.0.1:5432/analytics_test
+      TEST_DATABASE_URL: postgresql+asyncpg://analytics:ci-only-password@127.0.0.1:5432/analytics_test
+      PYTHON_DOTENV_DISABLED: "1"
+
+
+    steps:
+      - name: Download Project Files
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v9
+
+      - name: Install Python
+        run: uv python install 3.14
+
+      - name: Install dependencies
+        run: uv sync --locked --extra test 
+
+      - name: Apply database migrations
+        run: uv run --locked python -m alembic upgrade head
+
+      - name: Run backend tests
+        run: uv run --locked python -m pytest -q
+        
+    
+  frontend:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: Frontend
+
+    steps:
+      - name: Download project files
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check frontend code
+        run: npm run lint
+
+      - name: Build frontend
+        run: npm run build
