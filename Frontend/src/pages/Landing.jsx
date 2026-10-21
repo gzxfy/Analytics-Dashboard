@@ -15,13 +15,13 @@ export default function Landing() {
 
       <main>
         <section className="mx-auto flex min-h-[calc(100vh-4.5rem)] max-w-6xl flex-col justify-center px-5 py-16 sm:px-8 sm:py-20">
-          <p className="font-mono text-xs uppercase tracking-[0.2em] text-teal">
+          <h1 className="max-w-4xl font-sans text-5xl font-semibold leading-[1.08] tracking-tight text-ink sm:text-6xl lg:text-7xl">
             Event Analytics
-          </p>
-          <h1 className="mt-4 max-w-3xl font-sans text-4xl font-semibold leading-[1.12] tracking-tight text-ink sm:text-5xl lg:text-6xl">
-            Real-time event counts from ingest to browser.
           </h1>
-          <p className="mt-6 max-w-xl text-base leading-relaxed text-ink-muted sm:text-lg">
+          <p className="mt-5 max-w-2xl font-sans text-xl font-medium leading-snug text-teal sm:text-2xl">
+            Real-time event counts from ingest to browser.
+          </p>
+          <p className="mt-5 max-w-xl text-base leading-relaxed text-ink-muted sm:text-lg">
             FastAPI accepts events, PostgreSQL keeps them, and a React client
             redraws live aggregates over a WebSocket—built to practice backend
             pipelines, not chase UI chrome.
