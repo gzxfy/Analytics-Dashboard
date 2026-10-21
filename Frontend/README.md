@@ -1,16 +1,29 @@
-# React + Vite
+# Event Analytics — Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + Vite client for the real-time event analytics API. Landing page explains the pipeline; the dashboard streams aggregates over WebSockets and polls recent stored events.
 
-Currently, two official plugins are available:
+## Run
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+With the API on `http://127.0.0.1:8000`:
 
-## React Compiler
+```bash
+cd Frontend
+npm install
+npm run dev
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Open the URL Vite prints. Dev requests to `/events`, `/analytics`, `/health`, and `/ws` are proxied to the API (no CORS setup required).
 
-## Expanding the ESLint configuration
+## Optional env
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+| Variable | Purpose |
+| --- | --- |
+| `VITE_API_BASE` | REST base URL (default empty = same origin / proxy) |
+| `VITE_WS_URL` | Full WebSocket URL (default `ws(s)://<host>/ws/analytics`) |
+
+## Scripts
+
+- `npm run dev` — development server
+- `npm run build` — production build
+- `npm run preview` — preview production build
+- `npm run lint` — ESLint

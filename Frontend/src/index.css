@@ -1,0 +1,92 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Sora:wght@400;500;600;700&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Sora', ui-sans-serif, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --color-paper: #f4f7f9;
+  --color-paper-deep: #e8eef2;
+  --color-ink: #1a2332;
+  --color-ink-muted: #5a6a7a;
+  --color-ink-faint: #8a9aab;
+  --color-teal: #0f6b6b;
+  --color-teal-deep: #0a5252;
+  --color-teal-soft: #d4e8e8;
+  --color-line: #c5d0da;
+  --color-live: #0f6b6b;
+  --color-warn: #9a6b2f;
+  --color-error: #8b3a3a;
+}
+
+@layer base {
+  html {
+    @apply antialiased;
+  }
+
+  body {
+    @apply m-0 min-h-screen bg-paper font-sans text-ink;
+    background-image:
+      linear-gradient(rgba(26, 35, 50, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(26, 35, 50, 0.03) 1px, transparent 1px);
+    background-size: 32px 32px;
+    background-attachment: fixed;
+  }
+
+  #root {
+    @apply min-h-screen;
+  }
+
+  a {
+    @apply text-teal no-underline transition-colors duration-150;
+  }
+
+  a:hover {
+    @apply text-teal-deep;
+  }
+}
+
+@layer utilities {
+  .animate-live-pulse {
+    animation: live-pulse 1.6s ease-in-out infinite;
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.35s ease-out both;
+  }
+
+  .animate-chart-in {
+    animation: chart-in 0.5s ease-out both;
+  }
+}
+
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.85);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes chart-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
