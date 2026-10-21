@@ -11,51 +11,37 @@ export default function Dashboard() {
   const { events, status: eventsStatus, error: eventsError } = useRecentEvents(20, 3000)
 
   return (
-    <div className="min-h-screen">
+    <div className="page">
       <SiteHeader connectionStatus={connectionStatus} showStatus />
 
-      <main className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-12">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="font-sans text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
-              Live dashboard
-            </h1>
-            <p className="mt-2 max-w-xl text-sm text-ink-muted">
-              Snapshots from <span className="font-mono text-xs">/ws/analytics</span>.
-              Counts persist in PostgreSQL; events/sec is a rolling process window.
-            </p>
-          </div>
+      <main className="shell dashboard-main">
+        <div className="dashboard-intro">
+          <h1>Live dashboard</h1>
+          <p>
+            Snapshots from <code>/ws/analytics</code>. Counts persist in
+            PostgreSQL; events/sec is a rolling process window.
+          </p>
         </div>
 
         {!analytics ? (
-          <p className="mt-12 font-mono text-sm text-ink-muted">
-            Waiting for stream…
-          </p>
+          <p className="waiting">Waiting for stream…</p>
         ) : (
-          <div className="mt-10 space-y-14">
+          <div className="dashboard-stack">
             <DashboardCards analytics={analytics} />
 
             <section>
-              <div className="flex items-baseline justify-between gap-4">
-                <h2 className="font-sans text-lg font-semibold tracking-tight text-ink">
-                  Live traffic
-                </h2>
-                <p className="font-mono text-[0.65rem] uppercase tracking-[0.14em] text-ink-faint">
-                  Events / second
-                </p>
+              <div className="panel-head">
+                <h2>Live traffic</h2>
+                <p className="panel-head__meta">Events / second</p>
               </div>
-              <div className="mt-4">
-                <LiveTrafficGraph data={trafficData} />
-              </div>
+              <LiveTrafficGraph data={trafficData} />
             </section>
 
             <BreakdownCharts analytics={analytics} />
           </div>
         )}
 
-        <div className="mt-16">
-          <EventsTable events={events} status={eventsStatus} error={eventsError} />
-        </div>
+        <EventsTable events={events} status={eventsStatus} error={eventsError} />
       </main>
     </div>
   )

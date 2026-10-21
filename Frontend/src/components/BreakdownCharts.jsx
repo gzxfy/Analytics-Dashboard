@@ -26,23 +26,8 @@ function countsToRows(counts) {
     .sort((a, b) => b.count - a.count)
 }
 
-function ChartPanel({ title, children }) {
-  return (
-    <div className="min-w-0">
-      <h3 className="font-mono text-[0.65rem] uppercase tracking-[0.14em] text-ink-faint">
-        {title}
-      </h3>
-      <div className="mt-3 h-[200px] animate-chart-in">{children}</div>
-    </div>
-  )
-}
-
 function EmptyChart() {
-  return (
-    <div className="flex h-full items-center justify-center font-mono text-xs text-ink-faint">
-      No data yet
-    </div>
-  )
+  return <div className="chart-empty">No data yet</div>
 }
 
 function SimpleBarChart({ rows, fill = TEAL }) {
@@ -134,19 +119,25 @@ export function BreakdownCharts({ analytics }) {
   const sentiments = countsToRows(analytics?.sentiment_counts)
 
   return (
-    <section
-      aria-label="Count breakdowns"
-      className="grid gap-10 md:grid-cols-3"
-    >
-      <ChartPanel title="Topics">
-        <SimpleBarChart rows={topics} fill={TEAL} />
-      </ChartPanel>
-      <ChartPanel title="Platforms">
-        <SimpleBarChart rows={platforms} fill={TEAL_MID} />
-      </ChartPanel>
-      <ChartPanel title="Sentiment">
-        <SentimentBars rows={sentiments} />
-      </ChartPanel>
+    <section aria-label="Count breakdowns" className="breakdowns">
+      <div className="breakdown">
+        <h3>Topics</h3>
+        <div className="breakdown__chart">
+          <SimpleBarChart rows={topics} fill={TEAL} />
+        </div>
+      </div>
+      <div className="breakdown">
+        <h3>Platforms</h3>
+        <div className="breakdown__chart">
+          <SimpleBarChart rows={platforms} fill={TEAL_MID} />
+        </div>
+      </div>
+      <div className="breakdown">
+        <h3>Sentiment</h3>
+        <div className="breakdown__chart">
+          <SentimentBars rows={sentiments} />
+        </div>
+      </div>
     </section>
   )
 }

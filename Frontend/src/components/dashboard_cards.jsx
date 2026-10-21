@@ -4,13 +4,11 @@ function topEntry(counts, fallback = '—') {
   return entries.reduce((max, current) => (current[1] > max[1] ? current : max))
 }
 
-function Metric({ label, children }) {
+function Metric({ label, children, compact = false }) {
   return (
-    <div className="min-w-0 border-t border-line pt-4 first:border-t-0 first:pt-0 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-5 sm:first:border-l-0 sm:first:pl-0">
-      <p className="font-mono text-[0.65rem] uppercase tracking-[0.14em] text-ink-faint">
-        {label}
-      </p>
-      <div className="mt-2 animate-fade-in font-mono text-2xl font-medium tracking-tight text-ink sm:text-3xl">
+    <div className="metric">
+      <p className="metric__label">{label}</p>
+      <div className={`metric__value${compact ? ' metric__value--sm' : ''}`}>
         {children}
       </div>
     </div>
@@ -36,20 +34,15 @@ export function DashboardCards({ analytics }) {
       : 0
 
   return (
-    <section
-      aria-label="Key metrics"
-      className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-4"
-    >
+    <section aria-label="Key metrics" className="metrics">
       <Metric label="Total events">{totalEvents.toLocaleString()}</Metric>
       <Metric label="Events / sec">{eventsPerSecond}</Metric>
-      <Metric label="Top topic">
-        <span className="block truncate text-xl sm:text-2xl">{topTopic}</span>
+      <Metric label="Top topic" compact>
+        {topTopic}
       </Metric>
-      <Metric label="Top sentiment">
-        <span className="block truncate text-xl sm:text-2xl">
-          {topSentiment}
-          <span className="ml-2 text-base text-ink-muted">{sentimentPercentage}%</span>
-        </span>
+      <Metric label="Top sentiment" compact>
+        {topSentiment}
+        <span className="metric__pct">{sentimentPercentage}%</span>
       </Metric>
     </section>
   )
