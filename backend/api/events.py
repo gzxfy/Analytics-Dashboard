@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.api.analytics import record_event_arrival
+from backend.services.ingestion import save_event
 from backend.models.db import get_session
 from backend.models.models import Event
 from backend.models.schemas import EventCreate, EventRead
@@ -15,11 +15,8 @@ async def recieve_events(event: EventCreate, session: AsyncSession = Depends(get
     
     request_data = event.model_dump()
 
-    database_event = Event(**request_data)
-    session.add(database_event)
-    await session.commit()
-
-    record_event_arrival()
+    # Demo events and HTTP events share the same commit-and-count behavior.
+    await save_event(session, request_data)
 
     return {"status": "success", "event": request_data}
 

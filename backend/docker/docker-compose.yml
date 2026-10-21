@@ -32,6 +32,8 @@ services:
 
     environment:
       DATABASE_URL: ${DOCKER_DATABASE_URL:?Set DOCKER_DATABASE_URL}
+      # Local demo controls only; leave disabled on public deployments without authentication.
+      ENABLE_DEMO_STREAM: "true"
 
     depends_on:
       postgres:
@@ -39,4 +41,3 @@ services:
 
 volumes:
   postgres_data:
-    
