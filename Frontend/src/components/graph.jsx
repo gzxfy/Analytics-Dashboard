@@ -1,21 +1,5 @@
-
-import { useState, useEffect } from 'react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
-
-export default function Live_Traffic_Graph({analytics}) {
-    const [data, setData] = useState([]);
-
-    useEffect(() => {
-        if (!analytics) return
-
-        const point = {
-            time: Date.now(),
-            eventPerSecond: analytics.events_per_second ?? 0
-        };
-
-        setData((previous) =>  [...previous, point].slice(-240))
-    }, [analytics])
-
+export default function Live_Traffic_Graph({data}) {
     return (
         <ResponsiveContainer width="100%" height={300}>
             <AreaChart data={data}>
