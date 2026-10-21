@@ -1,8 +1,8 @@
 # Real-Time Event Analytics Dashboard
 
-A real-time event analytics dashboard. A Python event generator sends sample events to a FastAPI backend, which stores them in PostgreSQL and broadcasts analytics snapshots to a React dashboard over a WebSocket connection.
+Built a real-time event analytics dashboard with FastAPI, Pydantic, asynchronous SQLAlchemy, PostgreSQL, and React. The API validates and stores incoming events, serves database-backed analytics, and streams live snapshots to the dashboard over WebSockets. A sample event generator exercises the pipeline, while the React client reconnects when its WebSocket connection drops.
 
-Event history and aggregate counts are backed by PostgreSQL and persist when the backend restarts. The events-per-second metric is a process-local, rolling one-second count.
+Docker Compose runs the API and PostgreSQL with persistent database storage, locked Python dependencies, and a PostgreSQL health check. The API applies Alembic migrations before Uvicorn starts. Event history and aggregate counts persist across API restarts; the events-per-second metric is a rolling, process-local count. The project includes automated backend tests for validation, analytics, WebSocket recovery, and persistence behavior.
 
 ## What It Does
 

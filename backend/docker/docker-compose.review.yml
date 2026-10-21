@@ -1,0 +1,21 @@
+# Isolated local review database. Contains only disposable development credentials.
+# Run from the repository root with --env-file NUL to avoid loading .env.
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: review
+      POSTGRES_PASSWORD: review-local-only
+      POSTGRES_DB: analytics_test
+    ports:
+      - "127.0.0.1:55433:5432"
+    volumes:
+      - review_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U review -d analytics_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  review_postgres_data:
