@@ -5,6 +5,7 @@ import Live_Traffic_Graph from './components/graph'
 
 function App() {
   const [analytics, setAnalytics] = useState(null)
+  const [trafficData, setTrafficData] = useState([])
   const [connectionStatus, setConnectionStatus] = useState("connecting")
 
   // WebSocket connection and retry logic will be handled in the useEffect below. Helps stop scheduling multiple connections and manages reconnection attempts.
@@ -32,8 +33,13 @@ function App() {
 
       socket.addEventListener('message', (message) => {
         if (stopped) return
-
-        setAnalytics(JSON.parse(message.data))
+        const snapshot = JSON.parse(message.data)
+        const point = {
+          time: Date.now(),
+          eventsPerSecond: snapshot.events_per_second ?? 0
+        }
+        setAnalytics(snapshot)
+        setTrafficData((prev) => [...prev, point].slice(-240))
       })
 
       socket.addEventListener('error', () => {
@@ -103,7 +109,7 @@ function App() {
       <Dashboard_Cards analytics={analytics} />
 
       <h2>Live Traffic Graph</h2>
-      <Live_Traffic_Graph analytics={analytics} />
+      <Live_Traffic_Graph data={trafficData} />
     </main>
   )
 }
