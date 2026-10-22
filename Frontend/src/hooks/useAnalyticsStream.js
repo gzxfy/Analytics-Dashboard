@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
+import { ANALYTICS_STREAM_URL } from '../config.js'
 
-const STREAM_URL = 'ws://127.0.0.1:8000/ws/analytics'
 const INITIAL_RETRY_DELAY = 500
 const MAX_RETRY_DELAY = 30000
 const MAX_TRAFFIC_POINTS = 240
@@ -47,7 +47,7 @@ export default function useAnalyticsStream() {
       if (stopped) return
 
       setConnectionStatus('connecting')
-      socket = new WebSocket(STREAM_URL)
+      socket = new WebSocket(ANALYTICS_STREAM_URL)
 
       socket.addEventListener('open', () => {
         if (stopped) return

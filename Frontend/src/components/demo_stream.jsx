@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
+import { DEMO_STREAM_URL } from '../config.js'
 
-const STATUS_URL = '/api/demo-stream'
 const POLL_INTERVAL = 1500
 const MIN_RATE = 1
 const MAX_RATE = 20
@@ -19,7 +19,7 @@ export default function DemoStreamControls({ preview, onShowLive }) {
     // The server owns the task. Polling also picks up changes from other tabs.
     async function refreshStatus() {
       try {
-        const response = await fetch(STATUS_URL, { signal: abortController.signal })
+        const response = await fetch(DEMO_STREAM_URL, { signal: abortController.signal })
         if (!response.ok) throw new Error('Status unavailable')
 
         const currentStatus = await response.json()
@@ -38,7 +38,7 @@ export default function DemoStreamControls({ preview, onShowLive }) {
       clearInterval(pollTimer)
     }
   }, [])
-
+  // Convert the target rate to a number for validation and submission.
   const numericRate = Number(targetRate)
   const isValidRate = /^\d+$/.test(targetRate)
     && numericRate >= MIN_RATE
@@ -61,7 +61,7 @@ export default function DemoStreamControls({ preview, onShowLive }) {
     }
 
     try {
-      const response = await fetch(STATUS_URL, requestOptions)
+      const response = await fetch(DEMO_STREAM_URL, requestOptions)
       const updatedStatus = await response.json()
 
       if (!response.ok) {
