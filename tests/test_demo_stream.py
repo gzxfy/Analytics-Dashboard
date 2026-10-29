@@ -8,6 +8,7 @@ from fastapi import FastAPI
 
 from backend.api.demo_stream import router
 from backend.services.demo_stream import DemoStream
+from generator.generator import platforms, topics, sentiments
 
 
 @pytest.mark.anyio
@@ -46,7 +47,9 @@ async def test_counts_committed_writes_and_stops_at_deadline():
     await asyncio.wait_for(stream.task, 1)
     assert not stream.status()["running"]
     assert stream.generated == 1
-    assert payloads[0]["topic"].startswith("demo:")
+    assert payloads[0]["platform"] in platforms
+    assert payloads[0]["topic"] in topics
+    assert payloads[0]["sentiment"] in sentiments
 
 
 @pytest.mark.anyio

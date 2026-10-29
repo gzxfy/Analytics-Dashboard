@@ -1,9 +1,9 @@
 """Small synthetic stream for demonstrations; deliberately not a load tester."""
 
 import asyncio
-import random
 import time
 from collections.abc import Awaitable, Callable
+from generator.generator import generate_fake_event
 
 MIN_RATE = 1
 MAX_RATE = 100
@@ -63,12 +63,8 @@ class DemoStream:
         try:
             while time.monotonic() < self.deadline:
                 started = time.monotonic()
-                event = {
-                    "platform": random.choice(["reddit", "youtube", "twitter"]),
-                    # Prefix makes synthetic records identifiable without a schema migration.
-                    "topic": "demo:" + random.choice(["python", "react", "fastapi", "ai"]),
-                    "sentiment": random.choice(["positive", "neutral", "negative"]),
-                }
+                # Reuse the original generator's categories instead of maintaining a second list.
+                event = generate_fake_event()
                 await asyncio.wait_for(self.write_event(event), timeout=min(5, self.deadline - started))
                 self.generated += 1
                 # No catch-up bursts: slow writes reduce achieved rate rather than building a queue.

@@ -9,6 +9,8 @@ COPY pyproject.toml uv.lock ./
 # installs the dependencies 
 RUN uv sync --locked --no-dev --no-install-project
 COPY backend ./backend
+# The dashboard stream imports the original event factory; copy only its Python sources.
+COPY generator/__init__.py generator/generator.py ./generator/
 COPY alembic.ini ./
 ENV PATH="/app/.venv/bin:$PATH"
 # defines how to start application when container runs
