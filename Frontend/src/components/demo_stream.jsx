@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 const STATUS_URL = '/api/demo-stream'
 const POLL_INTERVAL = 1500
 const MIN_RATE = 1
-const MAX_RATE = 20
+const MAX_RATE = 100
 
 export default function DemoStreamControls({ preview, onShowLive }) {
   // Keep the input as text so users can clear it while entering a new rate.
@@ -46,17 +46,18 @@ export default function DemoStreamControls({ preview, onShowLive }) {
   const isRunning = Boolean(streamStatus?.running)
   const canStart = isValidRate && streamStatus?.enabled && !preview
   const isButtonDisabled = isSubmitting || (!isRunning && !canStart)
+  const hasRateChange = numericRate !== streamStatus?.target_rate
 
-  async function handleStreamControl() {
+  async function handleStreamControl(method) {
     setIsSubmitting(true)
     setRequestError('')
 
-    // Only start requests need a payload; stop requests cancel the shared task.
+    // POST starts, PATCH changes pacing, and DELETE stops the existing task.
     const requestOptions = {
-      method: isRunning ? 'DELETE' : 'POST',
+      method,
       headers: { 'Content-Type': 'application/json' },
     }
-    if (!isRunning) {
+    if (method !== 'DELETE') {
       requestOptions.body = JSON.stringify({ target_rate: numericRate })
     }
 
@@ -67,7 +68,7 @@ export default function DemoStreamControls({ preview, onShowLive }) {
       if (!response.ok) {
         const errorMessage = typeof updatedStatus.detail === 'string'
           ? updatedStatus.detail
-          : 'Unable to start demo stream.'
+          : 'Unable to update demo stream.'
         throw new Error(errorMessage)
       }
 
@@ -94,7 +95,7 @@ export default function DemoStreamControls({ preview, onShowLive }) {
   } else if (streamStatus?.error) {
     statusMessage = streamStatus.error
   } else if (isRunning) {
-    statusMessage = `Synthetic events running · ${streamStatus.generated} stored · ${streamStatus.remaining_seconds}s remaining`
+    statusMessage = `Synthetic events running · target ${streamStatus.target_rate}/sec · ${streamStatus.generated} stored · ${streamStatus.remaining_seconds}s remaining`
   } else if (!streamStatus) {
     statusMessage = 'Connect the backend to enable streaming.'
   } else if (!streamStatus.enabled) {
@@ -102,14 +103,14 @@ export default function DemoStreamControls({ preview, onShowLive }) {
   } else if (preview) {
     statusMessage = 'Switch to Live data to generate events.'
   } else {
-    statusMessage = `Ready · ${streamStatus.generated} events stored in last run · 1–20 events/sec`
+    statusMessage = `Ready · ${streamStatus.generated} events stored in last run · 1–100 events/sec`
   }
 
   return (
     <section className="generator-controls" aria-label="Synthetic event generator">
       <div className="generator-description">
         <strong>Demo event stream</strong>
-        <p>Writes synthetic events to your database. Stops automatically after 60 seconds.</p>
+        <p>Target 1–100 events/sec. Change the rate while running with Apply rate. Stops after 60 seconds; achieved throughput depends on database speed.</p>
       </div>
 
       <div className="generator-actions">
@@ -123,13 +124,23 @@ export default function DemoStreamControls({ preview, onShowLive }) {
             step="1"
             value={targetRate}
             onChange={(event) => setTargetRate(event.target.value)}
-            disabled={isSubmitting || isRunning}
+            disabled={isSubmitting}
             aria-invalid={!isValidRate}
           />
         </label>
+        {/* Apply explicitly so typing a rate does not send partial values to the server. */}
+        {isRunning && (
+          <button
+            className="generator-button"
+            onClick={() => handleStreamControl('PATCH')}
+            disabled={isSubmitting || !isValidRate || !hasRateChange}
+          >
+            Apply rate
+          </button>
+        )}
         <button
           className={`generator-button ${isRunning ? 'stop' : ''}`}
-          onClick={handleStreamControl}
+          onClick={() => handleStreamControl(isRunning ? 'DELETE' : 'POST')}
           disabled={isButtonDisabled}
         >
           {buttonLabel}

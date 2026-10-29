@@ -15,6 +15,7 @@ from backend.services.ingestion import save_event
 
 logger = logging.getLogger(__name__)
 
+# Broadcast analytics loop and application lifespan management
 async def broadcast_loop():
     while True:
         await asyncio.sleep(0.25)
