@@ -1,286 +1,237 @@
-# Real-Time Event Analytics Dashboard
+# Pulse · Real-Time Event Analytics
 
-Built a real-time event analytics dashboard with FastAPI, Pydantic, asynchronous SQLAlchemy, PostgreSQL, and React. The API validates and stores incoming events, serves database-backed analytics, and streams live snapshots to the dashboard over WebSockets. A sample event generator exercises the pipeline, while the React client reconnects when its WebSocket connection drops.
+A FastAPI, PostgreSQL, and React dashboard for generating events, watching live traffic, and exploring platform, topic, and sentiment counts. Start a stream from the dashboard and adjust its target rate while it runs.
 
-Docker Compose runs the API and PostgreSQL with persistent database storage, locked Python dependencies, and a PostgreSQL health check. The API applies Alembic migrations before Uvicorn starts. Event history and aggregate counts persist across API restarts; the events-per-second metric is a rolling, process-local count. The project includes automated backend tests for validation, analytics, WebSocket recovery, and persistence behavior.
+## Application demo
 
-## What It Does
+[![Watch Pulse running: live traffic, generator controls, and analytics](docs/evidence/application-demo-preview.gif)](docs/evidence/application-demo.mp4)
 
-Each event contains a `platform`, `topic`, and `sentiment`. The backend accepts events, keeps them in PostgreSQL, updates aggregate counts, and sends the latest analytics snapshot to connected browsers. The included generator creates sample Reddit, YouTube, and Twitter events every 0.2 seconds.
+**[Watch the full 45-second demo →](docs/evidence/application-demo.mp4)**
 
-Current backend endpoints:
+The animated preview above links to the complete recording, stored in `docs/evidence/application-demo.mp4`. The MP4 uses H.264 video, AAC audio, and fast-start playback for broad browser compatibility.
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/health` | Check whether the API is running. |
-| `POST` | `/events` | Validate and store one event in PostgreSQL. |
-| `GET` | `/events?limit=100&offset=0` | Return one ordered page of events; `limit` is between 1 and 500. |
-| `GET` | `/analytics` | Return aggregate event, topic, platform, and sentiment counts, plus the current events-per-second rate. |
-| WebSocket | `/ws/analytics` | Send the current snapshot on connect and broadcast subsequent updates. |
+## What you can do
 
-`GET /analytics?platform=reddit` filters all persistent counts to Reddit
-events. Omitting `platform` includes all events. A platform with no
-matching events returns zero and empty count dictionaries.
-`events_per_second` remains process-wide.
+- Start and stop a synthetic event stream directly from the dashboard.
+- Set a target of **1–100 events/sec**, then use **Apply rate** to change it during a run.
+- See the applied target, successfully stored event count, and remaining time. Each run stops automatically after **60 seconds**; rate changes do not reset its count or extend its deadline.
+- Watch live throughput, total stored events, leading topic, and leading sentiment.
+- Explore platform and sentiment breakdowns and ranked topics.
+- Switch between **Live data** and **Try demo**, a read-only preview that does not generate or store events.
+- Retain event history across API restarts. The frontend reconnects automatically after a dropped WebSocket connection.
 
-Interactive API documentation is available at <http://127.0.0.1:8000/docs> while the backend is running.
+Generated events reuse the original generator's categories: Reddit, YouTube, and Twitter; python, fastapi, react, ai, gaming, and linux; positive, neutral, and negative sentiment. They are simulated data, not scraped social-media posts. Both the dashboard generator and terminal script use the same event factory.
 
-## Verification evidence
-The ten-event dataset produced the expected platform, topic, and
-sentiment counts. After restarting the API, the dashboard reconnected
-and displayed the same totals.
+**The requested rate is a target, not a capacity benchmark.** Database writes are sequential, and slower writes reduce achieved throughput instead of building a catch-up queue. The events/sec metric counts committed arrivals over a rolling one-second window.
 
-- [Restart demonstration](docs/evidence/restart_demo_compatible.mp4)
-- [Backend test output](docs/evidence/backend-tests.txt)
-- [Before restart](docs/evidence/ten-events-before-restart.json)
-- [After restart](docs/evidence/ten-events-after-restart.json)
+## Run locally
 
-Backend verification: 32 tests passed, with one deprecation warning.
+Requirements: Docker Desktop with Compose, Node.js with npm, and Git. Python 3.14+ and uv are needed only for local Python development or running the terminal generator and tests outside Docker.
 
-## Run Locally
+Run the following commands from the repository root unless stated otherwise.
 
-Requirements: Docker Desktop with Docker Compose, Node.js, and npm.
-Run commands from the repository root unless stated otherwise.
+### 1. Configure the local database
 
-### 1. Configure PostgreSQL
-
-Create a local `.env` file in the repository root:
+Create a root `.env` file privately with these values:
 
 ```dotenv
 POSTGRES_PASSWORD=replace-with-your-local-password
 DOCKER_DATABASE_URL=postgresql+asyncpg://analytics:replace-with-your-local-password@postgres:5432/analytics_db
 ```
 
-Use the same password in both values. URL-encode special characters in
-the connection URL. Do not commit `.env`.
+Use the database user's actual password in both settings. URL-encode special characters in the connection URL, and never commit credentials. Changing `POSTGRES_PASSWORD` does not change a user already stored in an existing PostgreSQL volume.
 
+### 2. Start PostgreSQL and FastAPI
 
-### 2. Start PostgreSQL and the API
-
-Ensure Docker Desktop is running:
+For a **fresh checkout**, with Docker Desktop running:
 
 ```powershell
 docker compose --env-file .env -f backend/docker/docker-compose.yml up --build -d
 ```
 
-Compose waits for PostgreSQL to become healthy. The API container applies
-Alembic migrations before starting Uvicorn. Events persist in a named
-PostgreSQL volume.
+Compose waits for PostgreSQL to become healthy. The API applies Alembic migrations before starting. Data is stored in a persistent named volume, and local Compose enables the dashboard generator.
 
-Check the API:
-
-```powershell
-Invoke-RestMethod http://localhost:8000/health
-```
-
-API documentation: http://localhost:8000/docs
-
-### 3. Start the frontend
-
-In another terminal:
-
-```powershell
-cd Frontend
-npm install
-npm run dev
-```
-
-Open the URL printed by Vite. The frontend connects to
-`ws://127.0.0.1:8000/ws/analytics`.
-
-### 4. Submit 10 example events
-Start with an empty application database and submit this dataset once. Repeating it adds another ten events.
-
-```powershell
-$events = Get-Content .\demo\events.json -Raw | ConvertFrom-Json
-
-foreach ($event in $events) {
-    Invoke-RestMethod -Method Post `
-        -Uri "http://localhost:8000/events" `
-        -ContentType "application/json" `
-        -Body ($event | ConvertTo-Json -Compress)
-}
-```
-
-Each successful POST stores a new event.
-
-
-Expected ten-event counts:
-
-| Category | Counts |
-| --- | --- |
-| Total | 10 |
-| Platform | reddit 4, twitter 3, youtube 3 |
-| Topic | python 4, fastapi 3, react 3 |
-| Sentiment | positive 4, negative 3, neutral 3 |
-
-### 5. Restart or stop
-
-Restart only the API:
-
-```powershell
-docker compose --env-file .env -f backend/docker/docker-compose.yml restart api
-```
-
-Stored totals survive the restart. The frontend reconnects.
-Events per second and chart history remain process/browser-local.
-
-Stop the services while preserving database storage:
-
-```powershell
-docker compose --env-file .env -f backend/docker/docker-compose.yml down
-```
-
-Adding `-v` removes the Compose-managed volume and its stored data.
-
-### Optional: use the existing local data volume
-
-For a machine that already has the `analytics_pgdata` volume:
+**If you already use the `analytics_pgdata` volume**, include the existing-volume override instead:
 
 ```powershell
 docker compose --env-file .env -f backend/docker/docker-compose.yml -f backend/docker/docker-compose.existing.yml up --build -d
 ```
 
-This override is not required for a fresh checkout.
+Use the same file combination for future start, restart, and stop commands. The override reuses the existing database; omitting it selects a different Compose-managed volume. Stop any standalone PostgreSQL container using `analytics_pgdata` before starting Compose against that same volume.
 
-### Backend tests and dependency maintenance
+Check the API:
 
-Local backend development requires Python 3.14+ and uv:
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/health
+```
+
+API documentation: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).
+
+### 3. Start the dashboard
+
+In another terminal:
+
+```powershell
+cd Frontend
+npm ci
+npm run dev
+```
+
+Open the address printed by Vite. The frontend connects to `ws://127.0.0.1:8000/ws/analytics`; Vite forwards `/api` control requests to the backend during development.
+
+### 4. Generate events from the UI
+
+1. Select **Live data**.
+2. Enter a target between **1 and 100 events/sec**; the default is **5**.
+3. Click **Start demo stream**.
+4. While it runs, edit the target and click **Apply rate**. The active target appears in the status line.
+5. Click **Stop stream**, or let the original 60-second deadline expire.
+
+Only one dashboard-controlled stream runs per API process. Refreshing the browser does not start another task or reset its deadline. Other tabs see the same task through status polling. Stopping a stream leaves its stored events in PostgreSQL.
+
+**Try demo is separate:** it displays sample charts and counts without writing events. Switch back to Live data to use the generator controls.
+
+### Optional: terminal generator
+
+With local Python dependencies installed:
+
+```powershell
+uv run --locked python generator/generator.py
+```
+
+This independent script posts an event every 0.2 seconds until stopped with `Ctrl+C`. It does not share the dashboard stream's start/stop control. Stop it before using the dashboard control if you want only one event source.
+
+### Restart or stop
+
+For the default fresh-checkout stack:
+
+```powershell
+docker compose --env-file .env -f backend/docker/docker-compose.yml restart api
+docker compose --env-file .env -f backend/docker/docker-compose.yml down
+```
+
+For the existing-volume stack:
+
+```powershell
+docker compose --env-file .env -f backend/docker/docker-compose.yml -f backend/docker/docker-compose.existing.yml restart api
+docker compose --env-file .env -f backend/docker/docker-compose.yml -f backend/docker/docker-compose.existing.yml down
+```
+
+Restarting the API stops the active generator. Stored events and aggregate totals survive; the rolling throughput metric and browser chart history are temporary. `down` preserves storage. Do not add `-v` unless you intend to delete Compose-managed volumes and their data.
+
+## API
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/health` | Process liveness; does not verify database readiness. |
+| POST | `/events` | Validate and store one event. |
+| GET | `/events?limit=100&offset=0` | Ordered pagination; limit must be 1–500. |
+| GET | `/analytics` | Persistent counts plus rolling events/sec. |
+| WebSocket | `/ws/analytics` | Initial analytics snapshot and subsequent updates. |
+| GET | `/demo-stream` | Enabled/running status, target rate, stored count, remaining time, and error. |
+| POST | `/demo-stream` | Start a run with `{"target_rate": 5}`; returns 202. |
+| PATCH | `/demo-stream` | Change an active run with `{"target_rate": 100}`; returns 200. |
+| DELETE | `/demo-stream` | Stop the current run. |
+
+`GET /analytics?platform=reddit` filters persistent counts to one platform. The events/sec metric remains process-wide. No matching events returns zero total and empty count dictionaries.
+
+Generator rates must be integers from 1 to 100. Invalid payloads return 422, duplicate starts or updates without an active run return 409, and start/update requests return 403 when generation is disabled.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Dashboard[React dashboard] -->|Start / change rate / stop| Control[FastAPI stream controller]
+    Factory[Shared event factory] --> Control
+    Control --> Ingestion[Shared ingestion service]
+    Terminal[Optional terminal generator] -->|POST /events| API[FastAPI event route]
+    API --> Ingestion
+    Ingestion -->|Async SQLAlchemy| DB[(PostgreSQL)]
+    DB --> Aggregates[Analytics queries]
+    Aggregates -->|WebSocket snapshots| Dashboard
+```
+
+- **Backend:** FastAPI, Pydantic validation, async SQLAlchemy with asyncpg, and Alembic migrations.
+- **Storage:** PostgreSQL 17 in Docker with persistent storage and a health check.
+- **Updates:** a background loop sleeps 0.25 seconds between broadcast cycles and loads persistent analytics when clients are connected. Failures are logged so later cycles can retry.
+- **Frontend:** React, Vite, and Recharts. A dedicated hook handles WebSocket connection, bounded traffic history, and reconnection backoff. Generator controls poll backend status every 1.5 seconds.
+- **Lifecycle:** the application owns and cancels the generator task on shutdown. No shell subprocess is launched by the UI.
+
+The stream controller, WebSocket clients, and events/sec counter are process-local: run **one API worker**. Shared coordination is needed before scaling these features across workers.
+
+## Tests and CI
+
+Backend tests cover event persistence, validation, pagination, filtered analytics, WebSocket broadcasts and recovery, generator lifecycle, rate boundaries, and increasing/decreasing a running stream without resetting its task or deadline.
+
+Install local development dependencies:
 
 ```powershell
 uv sync --locked --extra test
 ```
 
-Add these local-only variables to `.env`, using the same PostgreSQL password:
+Configure these additional local-only settings privately, using your database password:
 
 ```dotenv
 DATABASE_URL=postgresql+asyncpg://analytics:replace-with-your-local-password@localhost:5433/analytics_db
 TEST_DATABASE_URL=postgresql+asyncpg://analytics:replace-with-your-local-password@localhost:5433/analytics_test
 ```
 
-Create the isolated test database once per fresh PostgreSQL volume:
+Create the dedicated test database once per new volume, using your stack's Compose files:
 
 ```powershell
 docker compose --env-file .env -f backend/docker/docker-compose.yml exec postgres createdb -U analytics analytics_test
+uv run --locked python -m pytest -q
 ```
 
-Then run:
+If using `analytics_pgdata`, include `-f backend/docker/docker-compose.existing.yml` in the database-creation command. The database fixture requires `analytics_test` and rolls back test writes rather than using application data.
+
+Frontend checks, from `Frontend/`:
 
 ```powershell
-uv run python -m pytest -q --tb=no
+npm run lint
+npm run build
 ```
 
-Tests use `analytics_test`, not the application's `analytics_db`.
+[GitHub Actions](.github/workflows/ci.yml) runs on pushes to `main` and pull requests targeting `main`. The backend job starts a temporary PostgreSQL service, installs locked dependencies, applies migrations, and runs tests. A separate frontend job installs dependencies, lints, and builds. This is CI; production deployment is not configured.
 
-`pyproject.toml` declares dependencies; `uv.lock` records resolved versions.
-Add runtime dependencies with `uv add PACKAGE` and test dependencies with
-`uv add --optional test PACKAGE`.
-
-Regenerate `requirements.txt` after dependency changes:
+Dependency declarations live in `pyproject.toml`; `uv.lock` records resolved versions. After dependency changes, regenerate the export and commit the dependency files together:
 
 ```powershell
 uv export --locked --extra test --no-hashes --output-file requirements.txt
 ```
 
-Commit all three dependency files together.
+## Recorded evidence
 
-## Architecture
+The current application recording is at the top of this README. Earlier verification artifacts demonstrate a fixed ten-event dataset and persistent counts after an API restart:
 
-### Current Architecture
+- [Earlier restart demonstration](docs/evidence/restart_demo_compatible.mp4)
+- [Historical backend test output](docs/evidence/backend-tests.txt)
+- [Ten events before restart](docs/evidence/ten-events-before-restart.json)
+- [Ten events after restart](docs/evidence/ten-events-after-restart.json)
 
-The API container runs `alembic upgrade head` before starting Uvicorn. `backend/app/main.py` creates the FastAPI application and runs a background analytics broadcaster sleeping 0.25 seconds between cycles. A broadcast failure is logged without stopping later iterations. `backend/api/events.py` validates incoming payloads with Pydantic, stores events through an async SQLAlchemy session, and returns events in bounded pages. `backend/services/analytics.py` queries PostgreSQL for persistent counts. `backend/api/analytics.py` serves analytics snapshots and broadcasts them to connected WebSocket clients; the events-per-second rate and client connections remain process-local. `generator/generator.py` posts sample events, and `Frontend/src/App.jsx` receives WebSocket snapshots, renders the dashboard, and reconnects with increasing delays if the socket closes.
+Those artifacts are historical evidence, not a claim about the latest test count. To reproduce the ten-event example, submit `demo/events.json` once to an empty application database; repeated submissions add duplicate events.
 
-The current database is PostgreSQL, accessed through SQLAlchemy's asyncpg driver. Event history and aggregate counts survive backend restarts. The rolling rate and WebSocket connections are in memory and are local to one backend process.
+## Current scope and next steps
 
-```mermaid
-flowchart TD
-		Client[Generator or dashboard client]
-		FastAPI[FastAPI]
-		SQLAlchemy[SQLAlchemy models and queries]
-		PostgreSQL[(PostgreSQL)]
-		WebSocket[WebSocket analytics updates]
-		React[React dashboard]
+This is a local demo application, not a deployed service or a social-media ingestion platform. Public deployment needs configurable frontend addresses and production API routing. Generator start/update are disabled by default outside the local Compose setup unless `ENABLE_DEMO_STREAM=true`; leave them disabled publicly until access controls are added.
 
-		Client --> FastAPI
-		FastAPI --> SQLAlchemy
-		SQLAlchemy --> PostgreSQL
-		FastAPI --> WebSocket
-		WebSocket --> React
-```
+Planned backend work: establish a repeatable load-testing baseline, measure aggregate-query cost, investigate bottlenecks, and add real database-outage recovery tests. The 100 events/sec input limit does not establish measured capacity. Redis and multi-worker distribution are future options, not implemented features.
 
-Alembic manages database schema revisions. Multi-worker distribution for live updates remains a future improvement.
-
-## Development Roadmap
-
-The roadmap is deliberately incremental: get one useful version working, then add engineering depth one feature at a time.
-
-### MVP 1: Real-time event loop
-
-- [x] FastAPI accepts event payloads.
-- [x] Sample generator posts events.
-- [x] Analytics are queried from PostgreSQL.
-- [x] WebSocket broadcasts snapshots to the React frontend.
-- [ ] Finish and verify the dashboard's metric displays and empty/disconnected states.
-
-### MVP 2: PostgreSQL persistence
-
-- [x] Store events in PostgreSQL using async SQLAlchemy.
-- [x] Query persistent event, topic, platform, and sentiment counts.
-- [x] Add an initial Alembic migration and verify fresh-storage startup.
-- [ ] Review indexes as data volume grows.
-
-### MVP 3: Automated tests
-
-- [x] Test event creation (`POST /events`), analytics (`GET /analytics`), payload validation, paginated event listing, and broadcaster recovery after a failed cycle.
-- [x] Test WebSocket initial snapshots, broadcasting, failed-client removal, and recovery after a mocked snapshot-loading failure.
-- [x] Test timestamp pruning on event arrival and analytics reads.
-- [x] Test removal of a client whose send raises a timeout exception.
-- [ ] Add larger-volume aggregate tests.
-- [x] Verify dashboard reconnection and persistent totals after an API restart.
-- [ ] Verify recovery from a real PostgreSQL outage.
-
-### MVP 4: Load testing
-
-Use Locust to simulate concurrent virtual users sending events and reading analytics. Measure requests per second, average latency, p95 latency, and error rate. Record the workload and environment alongside results so future comparisons are meaningful.
-
-### MVP 5: Docker
-
-- [x] Containerize FastAPI and PostgreSQL with Compose.
-- [x] Apply migrations before API startup.
-- [ ] Containerize the React frontend; it currently runs through Vite.
-
-### Later: Redis caching
-
-Consider Redis only after persistence and baseline measurements exist. If analytics queries become expensive, evaluate caching aggregate responses. Document what is cached, the TTL, invalidation behavior when events arrive, and cache hit/miss behavior. Measure the database-backed version first; Redis is optional if it does not solve a demonstrated problem.
-
-## Project Structure
+## Project layout
 
 ```text
 backend/
-	app/          FastAPI application setup
-	api/          Event and analytics HTTP/WebSocket routes
-	models/       SQLAlchemy models, schemas, and async database setup
-	services/     Database-backed analytics queries
-tests/          Backend API and analytics tests
-Frontend/
-	src/          React application and dashboard components
-generator/      Synthetic event producer
+  app/          Application lifecycle and route setup
+  api/          Events, analytics, WebSocket, and generator control endpoints
+  models/       Database setup, SQLAlchemy models, and Pydantic schemas
+  services/     Shared ingestion, persistent analytics, and stream controller
+  migrations/   Alembic schema revisions
+  docker/       API image and PostgreSQL Compose configuration
+Frontend/src/
+  components/   Metric cards, chart, dashboard sections, and generator controls
+  hooks/        WebSocket connection and traffic history
+  data/         Read-only preview fixtures
+generator/      Shared event factory and optional terminal producer
+tests/              Backend automated tests
+docs/evidence/ Demo recording and earlier verification artifacts
 ```
-
-## Useful Commands
-
-From the repository root, after PostgreSQL and the `analytics_test` database are running:
-
-```bash
-python -m pytest -q
-```
-
-From `Frontend/`:
-
-```bash
-npm run build
-npm run lint
-```
-
-Load testing is planned but not configured yet; see MVP 4 above for the proposed workload and metrics.
-
